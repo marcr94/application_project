@@ -9,18 +9,32 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## loading our file
+## set up work space
 
-```{r cars}
-summary(cars)
+We first clean up our working space, load packages, data...
+
+```{r}
+
+rm(list = ls())
+
+library(rstudioapi)
+
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+train_data <- read.csv("./training.csv")
+
+X_test <- read.csv("./X_test.csv")
+
+
 ```
 
-## Including Plots
+## Overview our data
 
-You can also embed plots, for example:
+Let's have a look at our data. We have no data set information/fact sheet so we will have to figure it out ourselves...
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+```{r, echo=FALSE}
+
+summary(train_data)
+
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
