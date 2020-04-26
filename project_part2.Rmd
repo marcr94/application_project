@@ -9,9 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## set up work space
-
-We first clean up our working space, load packages, data...
+## Set up work space
 
 ```{r}
 
@@ -47,15 +45,15 @@ We have the following columns:
 * address: addresses of the homes . sometimes with street name, street number, sometimes only postcode and town... pretty useless. we have the zipcode in an additional column anyway
 * area: should be the total built area of the home.
 * area_useable: the area of the home including land
-* date: probably building date or something is the same as year just including month and day
+* date: date of advertisement release
 * date available
 * home_type , ca. 190 categories
 * municipality . probably won't use, have post code
 * newly_built
 * price : our dependent variable in this exercise
 * rooms : number of rooms
-* street: street name
-* year: maybe evaluated year?
+* street: street name, won't use
+* year: year of advertisment release
 * year_built
 * zipcode
 * number of dummy variables:
@@ -111,7 +109,10 @@ dummy_cols <- c("balcony", "basement", "bath_tube", "building_plot", "cabletv", 
 
 train_without_dummyNA <- train_data %>% mutate_at(.vars = dummy_cols, .funs = funs(ifelse(is.na(.), 0, .)))
 
-train_imputed <- mice(train_without_dummyNA, m = 5, method = "fastpmm", maxit = 50, seed = 500)
+apply(train_without_dummyNA,2, pMiss)
+
+train_imputed <- train_without_dummyNA[1:100,]
+train_imputed <- mice(train_imputed, m = 2, method = "mean", maxit = 50, seed = 500)
 
 summary(train_without_dummyNA)
 summary(train_imputed)
@@ -128,6 +129,7 @@ Outlier detection and standardization.
 We will do further adjustments to our data. 
 
 ```{r}
+
 # var format transformations
 
 train_without_dummyNA$price <- as.integer(train_without_dummyNA$price) # price is a factor variable otherwise
