@@ -96,6 +96,8 @@ pMiss <- function(x){sum(is.na(x))/length(x)*100}
 apply(train_data,2, pMiss)
 ```
 
+This looks... bad ..^^
+
 Leaving out all rows with missing data is not an option, as it would leave us with pretty much no data (and for additional reasons like possible bias - the data is most likely not missing completely at random).
 
 One major problem: our dummy variable all only contain ones and NA's. This way, we have no way of knowing which of the NA's are actually NA's and which are 0s.
@@ -109,15 +111,45 @@ dummy_cols <- c("balcony", "basement", "bath_tube", "building_plot", "cabletv", 
 
 train_without_dummyNA <- train_data %>% mutate_at(.vars = dummy_cols, .funs = funs(ifelse(is.na(.), 0, .)))
 
+train_imputed <- mice(train_without_dummyNA, m = 5, method = "fastpmm", maxit = 50, seed = 500)
 
 summary(train_without_dummyNA)
+summary(train_imputed)
+```
+
+Outlier detection and standardization.
+
+```{r}
+
 
 ```
 
-Let's have a look at the new pattern with a nice overview from the mice package: 
+
+We will do further adjustments to our data. 
 
 ```{r}
-md.pattern(train_without_dummyNA)
+# var format transformations
+
+train_without_dummyNA$price <- as.integer(train_without_dummyNA$price) # price is a factor variable otherwise
+train_without_dummyNA$zipcode <- as.factor(train_without_dummyNA$zipcode) # zipcode should be factor - could even get more sophisticated (e.g. cantone...) with this one if time allows - the tax rate substantially differs across municipatlities in switzerland - that might well affect the prices of aparments
+
+
+
+
+train_lin_subset <- train_without_dummyNA %>% select(-c("address", "municipality", "street", "year", "date", "date_available", "zipcode"))
+```
+
+Trying out a linear regression with k fold cross validation.
+
+```{r}
+
+lin_fit <- cv.lm(train_imputed, form.lm = formula(price ~.))
+
+```
+
+
+```{r}
+md.pattern(train_lin_subset)
 ```
 
 Hello Jingyan !;))
