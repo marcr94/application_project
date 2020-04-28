@@ -139,11 +139,11 @@ train_imputed <- subset(train_without_dummyNA, select = -c(id, address, area_use
 apply(train_imputation,2, pMiss)
 
 # using "pmm" method from MICE package, as it needs quite a lot computation we set m=1 and maxit=1
-  train_imputed_pmm <- complete(mice(train_imputed, m=1, maxit = 5, meth = "pmm", seed = 50), 1) 
+  train_imputed_pmm <- complete(mice(train_imputed, m=2, maxit = 5, meth = "pmm", seed = 50), 1) 
 write.csv(train_imputed_pmm, file = "./train_imputed_pmm.csv", row.names = FALSE)
 
 # using "rf" method from MICE package
-  train_imputed_rf <- complete(mice(train_imputed, m=1, maxit = 5, meth = "rf", seed = 50), 1) 
+  train_imputed_rf <- complete(mice(train_imputed, m=2, maxit = 5, meth = "rf", seed = 50), 1) 
 write.csv(train_imputed_rf, file = "./train_imputed_rf.csv", row.names = FALSE)
 #apply(train_imputation_rf,2, pMiss)
 
