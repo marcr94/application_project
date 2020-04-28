@@ -20,6 +20,7 @@ library(mice)
 library(dplyr)
 library(Hmisc)
 library(randomForest)
+library(doParallel)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -113,31 +114,55 @@ train_without_dummyNA <- train_data %>% mutate_at(.vars = dummy_cols, .funs = fu
 
 apply(train_without_dummyNA,2, pMiss)
 
-train_imputed <- train_without_dummyNA[1:100,]
-train_imputed <- sapply(train_imputed, function(x)impute(x, fun = median))
-
 summary(train_without_dummyNA)
-summary(train_imputed)
 
 ######### Hi Marc! before imputing NAs I add and delete some vars. #########
 # For "new_building", it contains too many missing value, we can remove this variable;
 # For "new_built" and "year_built", we can find some observations a bit confusing:(
 # Most apartments built after 2011 are defined as "new_built" (label 1 for variable "new_built"), but some observations built in the same year are labelled diffently in "new_built". Also, the value of "new_building" and "new_built" are not equal to each other all the time.
-# What if we create a new variable, "age"? We find that some are built in the future, 2021 or 2022...
-train_without_dummyNA$age <- 2020 - train_without_dummyNA$year_built
+
+## multiple core computation
+
+
+# Counts the number of cores on your machine
+K <- parallel::detectCores()
+
+# This registers each core as a member of a
+# computing cluster
+
+cl <- makeCluster(K)
+
+registerDoParallel(cl)
 
 # delete some useless or redundant variables
-train_imputation <- subset(train_without_dummyNA, select = -c(id, address, area_useable, date, date_available, municipality, new_building, newly_built, oldbuilding, price, street, year, year_built))
+train_imputed <- subset(train_without_dummyNA, select = -c(id, address, area_useable, date, date_available, municipality, street))
 apply(train_imputation,2, pMiss)
 
 # using "pmm" method from MICE package, as it needs quite a lot computation we set m=1 and maxit=1
-train_imputation_pmm <- complete(mice(train_imputation, m=1, maxit = 1, meth = "pmm", seed = 50), 1) 
-#write.csv(train_imputation_pmm, file = "C:/Users/Young/Desktop/Big Data_Project/20_Part2_project/Part2_project/train_imputation_pmm.csv", row.names = FALSE)
+  train_imputed_pmm <- complete(mice(train_imputed, m=1, maxit = 5, meth = "pmm", seed = 50), 1) 
+write.csv(train_imputed_pmm, file = "./train_imputed_pmm.csv", row.names = FALSE)
 
 # using "rf" method from MICE package
-train_imputation_rf <- complete(mice(train_imputation, m=1, maxit = 1, meth = "rf", seed = 50), 1) 
-#write.csv(train_imputation_rf, file = "C:/Users/Young/Desktop/Big Data_Project/20_Part2_project/Part2_project/train_imputation_rf.csv", row.names = FALSE)
-apply(train_imputation_rf,2, pMiss)
+  train_imputed_rf <- complete(mice(train_imputed, m=1, maxit = 5, meth = "rf", seed = 50), 1) 
+write.csv(train_imputed_rf, file = "./train_imputed_rf.csv", row.names = FALSE)
+#apply(train_imputation_rf,2, pMiss)
+
+# Once you finished, you deactivate the cluster
+# with these two commands.
+stopCluster(cl)
+registerDoSEQ()
+
+```
+
+## Load imputed data froms stored CSV files
+
+```{r}
+train_imputed_pmm <- read.csv("./train_imputation_pmm.csv")
+train_imputed_rf <- read.csv("./train_imputation_rf.csv")
+
+# merge with price
+
+train_imputed_pmm <- train_imputed_pmm %>% left_join()
 ```
 
 Outlier detection and standardization.
@@ -167,7 +192,7 @@ Trying out a linear regression with k fold cross validation.
 
 ```{r}
 
-lin_fit <- cv.lm(train_imputed, form.lm = formula(price ~.))
+lin_fit <- cv.lm(train_imputed_pmm, form.lm = formula(price ~.))
 
 ```
 
