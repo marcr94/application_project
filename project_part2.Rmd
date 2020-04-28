@@ -18,6 +18,7 @@ rm(list = ls())
 library(rstudioapi)
 library(mice)
 library(dplyr)
+library(Hmisc)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -112,7 +113,7 @@ train_without_dummyNA <- train_data %>% mutate_at(.vars = dummy_cols, .funs = fu
 apply(train_without_dummyNA,2, pMiss)
 
 train_imputed <- train_without_dummyNA[1:100,]
-train_imputed <- mice(train_imputed, m = 2, method = "mean", maxit = 50, seed = 500)
+train_imputed <- sapply(train_imputed, function(x)impute(x, fun = median))
 
 summary(train_without_dummyNA)
 summary(train_imputed)
