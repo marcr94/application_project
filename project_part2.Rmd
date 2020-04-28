@@ -19,6 +19,7 @@ library(rstudioapi)
 library(mice)
 library(dplyr)
 library(Hmisc)
+library(randomForest)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -117,6 +118,26 @@ train_imputed <- sapply(train_imputed, function(x)impute(x, fun = median))
 
 summary(train_without_dummyNA)
 summary(train_imputed)
+
+######### Hi Marc! before imputing NAs I add and delete some vars. #########
+# For "new_building", it contains too many missing value, we can remove this variable;
+# For "new_built" and "year_built", we can find some observations a bit confusing:(
+# Most apartments built after 2011 are defined as "new_built" (label 1 for variable "new_built"), but some observations built in the same year are labelled diffently in "new_built". Also, the value of "new_building" and "new_built" are not equal to each other all the time.
+# What if we create a new variable, "age"? We find that some are built in the future, 2021 or 2022...
+train_without_dummyNA$age <- 2020 - train_without_dummyNA$year_built
+
+# delete some useless or redundant variables
+train_imputation <- subset(train_without_dummyNA, select = -c(id, address, area_useable, date, date_available, municipality, new_building, newly_built, oldbuilding, price, street, year, year_built))
+apply(train_imputation,2, pMiss)
+
+# using "pmm" method from MICE package, as it needs quite a lot computation we set m=1 and maxit=1
+train_imputation_pmm <- complete(mice(train_imputation, m=1, maxit = 1, meth = "pmm", seed = 50), 1) 
+#write.csv(train_imputation_pmm, file = "C:/Users/Young/Desktop/Big Data_Project/20_Part2_project/Part2_project/train_imputation_pmm.csv", row.names = FALSE)
+
+# using "rf" method from MICE package
+train_imputation_rf <- complete(mice(train_imputation, m=1, maxit = 1, meth = "rf", seed = 50), 1) 
+#write.csv(train_imputation_rf, file = "C:/Users/Young/Desktop/Big Data_Project/20_Part2_project/Part2_project/train_imputation_rf.csv", row.names = FALSE)
+apply(train_imputation_rf,2, pMiss)
 ```
 
 Outlier detection and standardization.
