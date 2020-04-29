@@ -160,6 +160,12 @@ Now we cleaned quite some parts from the dataset . We still have area, floors, r
 
 ## Imputation Part
 
+https://stats.stackexchange.com/questions/219013/how-do-the-number-of-imputations-the-maximum-iterations-affect-accuracy-in-mul
+
+--> Informative stackoverflow about imputation methods in mice. 
+Although with multiple imputed data sets we would reach better accuracy, it is only advisable to use multiple imputed data sets assuming we have a linera 
+
+
 ```{r}
 ## multiple core computation
 
@@ -175,12 +181,13 @@ cl <- makeCluster(K)
 registerDoParallel(cl)
 
 # using "pmm" method from MICE package, as it needs quite a lot computation we set m=1 and maxit=1
-  train_imputed_pmm <- complete(mice(train_imputed, m=40, maxit = 20, meth = "pmm", seed = 50), 1) 
+  train_imputed_pmm <- mice(train_without_dummyNA, m=1, maxit = 20, meth = "pmm", seed = 50)
 write.csv(train_imputed_pmm, file = "./train_imputed_pmm.csv", row.names = FALSE)
-
+ 
 # using "rf" method from MICE package
-  train_imputed_rf <- complete(mice(train_imputed, m=40, maxit = 20, meth = "rf", seed = 50), 1) 
+  train_imputed_rf <- mice(train_without_dummyNA, m=1, maxit = 20, meth = "rf", seed = 50)
 write.csv(train_imputed_rf, file = "./train_imputed_rf.csv", row.names = FALSE)
+
 #apply(train_imputation_rf,2, pMiss)
 
 # Once you finished, you deactivate the cluster
@@ -194,7 +201,7 @@ registerDoSEQ()
 
 ```{r}
 
-plot(train_imputed_pmm$area, train_imputed_pmm$price) # maybe delete area >600 # relationship seems pretty much linear - but really can't tell, so many observations
+plot(train_imputed_pmm$area, train_imputed_pmm$price) # maybe delete area >600 # relationship seems pretty much linear - but really can't tell, too many observations
 
 plot(train_imputed_pmm$floors, train_imputed_pmm$price) # no relationship detectable
 
@@ -205,18 +212,23 @@ plot(train_imputed_pmm$year, train_imputed_pmm$price) # no relationship detectab
 plot(train_imputed_pmm$year_built, train_imputed_pmm$price) # no relationship detectable
 ```
 
-Really hard to detect any relationship.
+Really hard to detect any relationship, for example to use polynomials in linear regression.
 
-Trying out a linear regression with k fold cross validation.
+
+## Linear regression with k fold cross validation.
+
+We include some interaction variables 
 
 ```{r}
 
 # Split the data into training and test set
+
 set.seed(123)
-training.samples <- train_lin_subset$price %>%
+training.samples <- train_imputed_pmm$price %>%
   createDataPartition(p = 0.8, list = FALSE)
-train.data  <- train_lin_subset[training.samples, ]
-test.data <- train_lin_subset[-training.samples, ]
+train.data  <- train_imputed_pmm[training.samples, ]
+test.data <- train_imputed_pmm[-training.samples, ]
+
 # Build the model
 lm_fit <- lm(price ~., data = train.data)
 
