@@ -111,14 +111,11 @@ First approach: Coding all NA's in dummy vars to 0. New meaning of predictor: no
 
 ```{r}
 
-# i have done this manually because i didn't find a nice solution in R to select columns conditional on mean , min and max (would all be 1)
 dummy_cols <- c("balcony", "basement", "bath_tube", "building_plot", "cabletv", "ceiling", "cheminee", "elevator", "first_time", "furnished", "kids_friendly", "laundry", "minergie", "new_building", "oldbuilding", "oven", "parking_indoor", "parking_outside", "playground", "pool", "quiet", "raised_groundfloor", "sale", "sunny", "terrace", "topstorage", "veranda", "wheelchair")
 
 train_without_dummyNA <- train_data %>% mutate_at(.vars = dummy_cols, .funs = funs(ifelse(is.na(.), 0, .)))
 
 apply(train_without_dummyNA,2, pMiss)
-
-summary(train_without_dummyNA)
 ```
 
 Let us check for some specific numeric variables, if there are some significant outliers in the dataset.
@@ -130,16 +127,40 @@ plot(train_without_dummyNA$price) # not real outliers
 plot(train_without_dummyNA$rooms) # not real outliers
 plot(train_without_dummyNA$year_built) # we could delete the obs. from 1200
 
-train_without_dummyNA <- train_without_dummyNA[train_without_dummyNA$year_built >="13000",] # deletes 4 obs.
+train_without_dummyNA <- train_without_dummyNA %>% filter(is.na(year_built) | year_built >=1300) # deletes 4 obs.
 ```
 
-Now we move to the imputation part.
+## Further Adjustments
 
 ```{r}
 
+# var format transformations
+
+train_without_dummyNA$price <- as.integer(train_without_dummyNA$price) # price is a factor variable otherwise
+
+# do not use zip code but first three digits of zip code -- otherwise too many clusters having too few observations
+
+train_without_dummyNA$zipcode <- floor(train_without_dummyNA$zipcode/10)
+train_without_dummyNA$zipcode <- as.factor(train_without_dummyNA$zipcode) # zipcode should be factor
+table(train_without_dummyNA$zipcode)
+
 # delete some useless or redundant variables
-train_imputed <- subset(train_without_dummyNA, select = -c(id, address, area_useable, date, date_available, municipality, street))
-apply(train_imputed,2, pMiss)
+train_without_dummyNA <- subset(train_without_dummyNA, select = -c(id, 
+                                                                   address, 
+                                                                   area_useable, # too many missing values
+                                                                   date, # date of ad publishment should not matter
+                                                                   date_available, # too sparse information
+                                                                   municipality, # we have zip code
+                                                                   street)) # again, we use zip code
+apply(train_without_dummyNA,2, pMiss)
+
+```
+
+Now we cleaned quite some parts from the dataset . We still have area, floors, rooms and year_built with missing data. For these variables, we will use the mice package to impute them.
+
+## Imputation Part
+
+```{r}
 ## multiple core computation
 
 
@@ -154,11 +175,11 @@ cl <- makeCluster(K)
 registerDoParallel(cl)
 
 # using "pmm" method from MICE package, as it needs quite a lot computation we set m=1 and maxit=1
-  train_imputed_pmm <- complete(mice(train_imputed, m=2, maxit = 5, meth = "pmm", seed = 50), 1) 
+  train_imputed_pmm <- complete(mice(train_imputed, m=40, maxit = 20, meth = "pmm", seed = 50), 1) 
 write.csv(train_imputed_pmm, file = "./train_imputed_pmm.csv", row.names = FALSE)
 
 # using "rf" method from MICE package
-  train_imputed_rf <- complete(mice(train_imputed, m=2, maxit = 5, meth = "rf", seed = 50), 1) 
+  train_imputed_rf <- complete(mice(train_imputed, m=40, maxit = 20, meth = "rf", seed = 50), 1) 
 write.csv(train_imputed_rf, file = "./train_imputed_rf.csv", row.names = FALSE)
 #apply(train_imputation_rf,2, pMiss)
 
@@ -169,36 +190,22 @@ registerDoSEQ()
 
 ```
 
-## Load imputed data froms stored CSV files
+## Look at correalation
 
 ```{r}
 
-train_imputed_pmm <- read.csv("./train_imputation_pmm.csv")
-train_imputed_rf <- read.csv("./train_imputation_rf.csv")
+plot(train_imputed_pmm$area, train_imputed_pmm$price) # maybe delete area >600 # relationship seems pretty much linear - but really can't tell, so many observations
 
+plot(train_imputed_pmm$floors, train_imputed_pmm$price) # no relationship detectable
 
+plot(train_imputed_pmm$rooms, train_imputed_pmm$price) # no relationship detectable
+
+plot(train_imputed_pmm$year, train_imputed_pmm$price) # no relationship detectable
+
+plot(train_imputed_pmm$year_built, train_imputed_pmm$price) # no relationship detectable
 ```
 
-Outlier detection and standardization.
-
-```{r}
-
-
-```
-
-
-We will do further adjustments to our data. 
-
-```{r}
-
-# var format transformations
-
-train_imputed_pmm$price <- as.integer(train_without_dummyNA$price) # price is a factor variable otherwise
-train_imputed_pmm$zipcode <- as.factor(train_without_dummyNA$zipcode) # zipcode should be factor - could even get more sophisticated (e.g. cantone...) with this one if time allows - the tax rate substantially differs across municipatlities in switzerland - that might well affect the prices of aparments
-
-train_lin_subset <- train_imputed_pmm %>% select(-c("year", "zipcode"))
-```
-
+Really hard to detect any relationship.
 
 Trying out a linear regression with k fold cross validation.
 
