@@ -2,7 +2,9 @@
 title: "Application Part Big Data for Economists Seminar"
 author: "Marc Richter and Jingyan Yang"
 date: "25 4 2020"
-output: html_document
+output:
+  pdf_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -264,7 +266,7 @@ mean((lasso_pred - test_y)^2)
 
 out <- glmnet(lasso_x, lasso_y, alpha = 1)
 lasso.coef <- predict(out, type = "coefficients", s= bestlam)[1:20,]
-
+ 
 lasso.coef[lasso.coef != 0]
 ```
 Our lasso model has the advantage that there is only 15 predictors left which are used for computing the estimates. However, our MSE is huge - some orders of magnitude higher than the error for the linear model.
