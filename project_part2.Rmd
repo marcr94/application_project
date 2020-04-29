@@ -22,6 +22,7 @@ library(Hmisc)
 library(randomForest)
 library(doParallel)
 library(caret)
+library(glmnet)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -210,6 +211,7 @@ test.data <- train_lin_subset[-training.samples, ]
 # Build the model
 lm_fit <- lm(price ~., data = train.data)
 
+## test for influential observations via cooks distance
 cooksd <- cooks.distance(lm_fit)
 
 plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  # plot cook's distance
@@ -238,15 +240,34 @@ data.frame( R2 = R2(predictions_without_outliers, test.data$price),
             MAE = MAE(predictions_without_outliers, test.data$price))
 ```
 
-Our validation set error is pretty high, and deleting outlier observations does not change this. We should try out different approaches. 
+Our validation set error is pretty high, and deleting outlier observations does not considerably change this. We should try out different approaches.
 
+
+## Moving to LASSO
+Our data has quite some variables. Especially as we redifined NA's to 0 in the case of dummy variables and imputed the other ones, this can introduce bias. Also, we do not want our model to get into the trap of what is known as "the curse of dimensionality". One way to work against this is to build a LASSO Model - which is designed to force coefficients to get exactly zero. This way, we might be able to drop some variables which do not have good explanational power.
 
 ```{r}
+# reform X (training and test) and Y training for lasso input
+lasso_x <- model.matrix(price ~., train.data)[,-1]
+lasso_y <- train.data$price
 
+test_x <- model.matrix(price ~., test.data)[,-1]
+test_y <- test.data$price
+# fit model 
 
+lasso_fit <- glmnet(lasso_x, lasso_y, alpha = 1)
+set.seed(1)
+cv.out <- cv.glmnet(lasso_x, lasso_y, alpha = 1)
+bestlam <- cv.out$lambda.min
+lasso_pred <- predict(lasso_fit, s = bestlam, newx = test_x)
+mean((lasso_pred - test_y)^2)
 
+out <- glmnet(lasso_x, lasso_y, alpha = 1)
+lasso.coef <- predict(out, type = "coefficients", s= bestlam)[1:20,]
+
+lasso.coef[lasso.coef != 0]
 ```
-
+Our lasso model has the advantage that there is only 15 predictors left which are used for computing the estimates. However, our MSE is huge - some orders of magnitude higher than the error for the linear model.
 
 ## Imputation of the test dataset .
 
