@@ -17,10 +17,11 @@ rm(list = ls())
 
 library(rstudioapi)
 library(mice)
-library(dplyr)
+library(tidyverse)
 library(Hmisc)
 library(randomForest)
 library(doParallel)
+library(caret)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -115,12 +116,27 @@ train_without_dummyNA <- train_data %>% mutate_at(.vars = dummy_cols, .funs = fu
 apply(train_without_dummyNA,2, pMiss)
 
 summary(train_without_dummyNA)
+```
 
-######### Hi Marc! before imputing NAs I add and delete some vars. #########
-# For "new_building", it contains too many missing value, we can remove this variable;
-# For "new_built" and "year_built", we can find some observations a bit confusing:(
-# Most apartments built after 2011 are defined as "new_built" (label 1 for variable "new_built"), but some observations built in the same year are labelled diffently in "new_built". Also, the value of "new_building" and "new_built" are not equal to each other all the time.
+Let us check for some specific numeric variables, if there are some significant outliers in the dataset.
 
+```{r}
+plot(train_without_dummyNA$area) # not real outliers
+plot(train_without_dummyNA$floors) # not real outliers
+plot(train_without_dummyNA$price) # not real outliers
+plot(train_without_dummyNA$rooms) # not real outliers
+plot(train_without_dummyNA$year_built) # we could delete the obs. from 1200
+
+train_without_dummyNA <- train_without_dummyNA[train_without_dummyNA$year_built >="13000",] # deletes 4 obs.
+```
+
+Now we move to the imputation part.
+
+```{r}
+
+# delete some useless or redundant variables
+train_imputed <- subset(train_without_dummyNA, select = -c(id, address, area_useable, date, date_available, municipality, street))
+apply(train_imputed,2, pMiss)
 ## multiple core computation
 
 
@@ -133,10 +149,6 @@ K <- parallel::detectCores()
 cl <- makeCluster(K)
 
 registerDoParallel(cl)
-
-# delete some useless or redundant variables
-train_imputed <- subset(train_without_dummyNA, select = -c(id, address, area_useable, date, date_available, municipality, street))
-apply(train_imputation,2, pMiss)
 
 # using "pmm" method from MICE package, as it needs quite a lot computation we set m=1 and maxit=1
   train_imputed_pmm <- complete(mice(train_imputed, m=2, maxit = 5, meth = "pmm", seed = 50), 1) 
@@ -157,12 +169,11 @@ registerDoSEQ()
 ## Load imputed data froms stored CSV files
 
 ```{r}
+
 train_imputed_pmm <- read.csv("./train_imputation_pmm.csv")
 train_imputed_rf <- read.csv("./train_imputation_rf.csv")
 
-# merge with price
 
-train_imputed_pmm <- train_imputed_pmm %>% left_join()
 ```
 
 Outlier detection and standardization.
@@ -179,26 +190,101 @@ We will do further adjustments to our data.
 
 # var format transformations
 
-train_without_dummyNA$price <- as.integer(train_without_dummyNA$price) # price is a factor variable otherwise
-train_without_dummyNA$zipcode <- as.factor(train_without_dummyNA$zipcode) # zipcode should be factor - could even get more sophisticated (e.g. cantone...) with this one if time allows - the tax rate substantially differs across municipatlities in switzerland - that might well affect the prices of aparments
+train_imputed_pmm$price <- as.integer(train_without_dummyNA$price) # price is a factor variable otherwise
+train_imputed_pmm$zipcode <- as.factor(train_without_dummyNA$zipcode) # zipcode should be factor - could even get more sophisticated (e.g. cantone...) with this one if time allows - the tax rate substantially differs across municipatlities in switzerland - that might well affect the prices of aparments
 
-
-
-
-train_lin_subset <- train_without_dummyNA %>% select(-c("address", "municipality", "street", "year", "date", "date_available", "zipcode"))
+train_lin_subset <- train_imputed_pmm %>% select(-c("year", "zipcode"))
 ```
+
 
 Trying out a linear regression with k fold cross validation.
 
 ```{r}
 
-lin_fit <- cv.lm(train_imputed_pmm, form.lm = formula(price ~.))
+# Split the data into training and test set
+set.seed(123)
+training.samples <- train_lin_subset$price %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train.data  <- train_lin_subset[training.samples, ]
+test.data <- train_lin_subset[-training.samples, ]
+# Build the model
+lm_fit <- lm(price ~., data = train.data)
 
+cooksd <- cooks.distance(lm_fit)
+
+plot(cooksd, pch="*", cex=2, main="Influential Obs by Cooks distance")  # plot cook's distance
+abline(h = 4*mean(cooksd, na.rm=T), col="green")  # add cutoff line
+text(x=1:length(cooksd)+1, y=cooksd, labels=ifelse(cooksd>4*mean(cooksd, na.rm=T),names(cooksd),""), col="blue")  # add labels
+influential <- as.numeric(names(cooksd)[(cooksd > 4*mean(cooksd, na.rm=T))])  # influential row numbers
+head(train.data[influential, ])  # influential observations.
+
+# delete influential data points
+
+train.data_without_outliers <- train.data[-influential,]
+
+# new model 
+
+lm_fit_without_outliers <- lm(price ~., data = train.data_without_outliers)
+
+# Make predictions and compute the R2, RMSE and MAE
+predictions <- lm_fit %>% predict(test.data)
+predictions_without_outliers <- lm_fit_without_outliers %>% predict(test.data)
+data.frame( R2 = R2(predictions, test.data$price),
+            RMSE = RMSE(predictions, test.data$price),
+            MAE = MAE(predictions, test.data$price))
+
+data.frame( R2 = R2(predictions_without_outliers, test.data$price),
+            RMSE = RMSE(predictions_without_outliers, test.data$price),
+            MAE = MAE(predictions_without_outliers, test.data$price))
 ```
+
+Our validation set error is pretty high, and deleting outlier observations does not change this. We should try out different approaches. 
 
 
 ```{r}
-md.pattern(train_lin_subset)
+
+
+
 ```
 
-Hello Jingyan !;))
+
+## Imputation of the test dataset .
+
+```{r}
+# substitute NA's in dummy vars with 0
+X_test_without_dummyNA <- X_test %>% mutate_at(.vars = dummy_cols, .funs = funs(ifelse(is.na(.), 0, .)))
+
+# delete some useless or redundant variables
+X_test_imputed <- subset(X_test_without_dummyNA, select = -c(id, address, area_useable, date, date_available, municipality, street))
+
+apply(X_test_without_dummyNA,2, pMiss)
+
+summary(X_test_without_dummyNA)
+## multiple core computation
+
+
+# Counts the number of cores on your machine
+K <- parallel::detectCores()
+
+# This registers each core as a member of a
+# computing cluster
+
+cl <- makeCluster(K)
+
+registerDoParallel(cl)
+
+# using "pmm" method from MICE package, as it needs quite a lot computation we set m=1 and maxit=1
+  X_test_imputed_pmm <- complete(mice(X_test_imputed, m=2, maxit = 5, meth = "pmm", seed = 50), 1) 
+write.csv(X_test_imputed_pmm, file = "./X_test_imputed_pmm.csv", row.names = FALSE)
+
+# using "rf" method from MICE package
+  train_imputed_rf <- complete(mice(train_imputed, m=2, maxit = 5, meth = "rf", seed = 50), 1) 
+write.csv(train_imputed_rf, file = "./train_imputed_rf.csv", row.names = FALSE)
+#apply(train_imputation_rf,2, pMiss)
+
+# Once you finished, you deactivate the cluster
+# with these two commands.
+stopCluster(cl)
+registerDoSEQ()
+
+```
