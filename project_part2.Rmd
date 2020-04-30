@@ -184,11 +184,15 @@ registerDoParallel(cl)
   train_imputed_pmm <- mice(train_without_dummyNA, m=1, maxit = 20, meth = "pmm", seed = 50)
 write.csv(train_imputed_pmm, file = "./train_imputed_pmm.csv", row.names = FALSE)
  
-# using "rf" method from MICE package
-  train_imputed_rf <- mice(train_without_dummyNA, m=1, maxit = 20, meth = "rf", seed = 50)
-write.csv(train_imputed_rf, file = "./train_imputed_rf.csv", row.names = FALSE)
+# using "norm.predict" method from MICE package
+  train_imputed_norm <- complete(mice(train_without_dummyNA, m=1, maxit = 20, meth = "norm.predict", seed = 50))
+write.csv(train_imputed_norm, file = "./train_imputed_norm.csv", row.names = FALSE)
+apply(train_imputed_norm,2, pMiss) 
 
-#apply(train_imputation_rf,2, pMiss)
+# using "rf" method from MICE package
+  train_imputed_rf <- complete(mice(train_without_dummyNA, m=1, maxit = 20, meth = "rf", seed = 50))
+write.csv(train_imputed_rf, file = "./train_imputed_rf.csv", row.names = FALSE)
+apply(train_imputed_rf,2, pMiss)
 
 # Once you finished, you deactivate the cluster
 # with these two commands.
@@ -200,8 +204,35 @@ registerDoSEQ()
 
 ```{r}
 train_imputed_pmm <- read.csv("./train_imputed_pmm.csv")
-apply(train_imputed_pmm,2, pMiss)
+train_imputed_norm <- read.csv("./train_imputed_norm.csv")
+train_imputed_rf <- read.csv("./train_imputed_rf.csv")
 
+# Look at the distribution of imputed numeric data, the plot is ugly haha
+# area
+plot(density(train_without_dummyNA$area, na.rm = TRUE))
+lines(density(train_imputed_pmm$area), col = "red")
+lines(density(train_imputed_norm$area), col = "green")
+lines(density(train_imputed_rf$area), col = "blue")
+
+# floors
+plot(density(train_without_dummyNA$floors, na.rm = TRUE))
+lines(density(train_imputed_pmm$floors), col = "red")
+lines(density(train_imputed_norm$floors), col = "green")
+lines(density(train_imputed_rf$floors), col = "blue")
+
+# rooms
+plot(density(train_without_dummyNA$rooms, na.rm = TRUE))
+lines(density(train_imputed_pmm$rooms), col = "red")
+lines(density(train_imputed_norm$rooms), col = "green")
+lines(density(train_imputed_rf$rooms), col = "blue")
+
+# year_built
+plot(density(train_without_dummyNA$year_built, na.rm = TRUE))
+lines(density(train_imputed_pmm$year_built), col = "red")
+lines(density(train_imputed_norm$year_built), col = "green")
+lines(density(train_imputed_rf$year_built), col = "blue")
+
+# for pmm dataset
 class(train_imputed_pmm$zipcode) # zipcode in the imputed dataset is still interger
 class(train_imputed_pmm$price) # price in the imputed dataset is still factor
 
