@@ -121,7 +121,7 @@ apply(train_without_dummyNA,2, pMiss)
 Let us check for some specific numeric variables, if there are some significant outliers in the dataset.
 
 ```{r}
-plot(train_without_dummyNA$area) # not real outliers
+plot(train_without_dummyNA$area) # not real outliers #but when check manually some observations with area=1, which does not make sense...
 plot(train_without_dummyNA$floors) # not real outliers
 plot(train_without_dummyNA$price) # not real outliers
 plot(train_without_dummyNA$rooms) # not real outliers
@@ -196,7 +196,123 @@ stopCluster(cl)
 registerDoSEQ()
 
 ```
+## Load the imputed dataset
 
+```{r}
+train_imputed_pmm <- read.csv("./train_imputed_pmm.csv")
+apply(train_imputed_pmm,2, pMiss)
+
+class(train_imputed_pmm$zipcode) # zipcode in the imputed dataset is still interger
+class(train_imputed_pmm$price) # price in the imputed dataset is still factor
+
+# repeat var transformation as mentioned above
+train_imputed_pmm$price <- as.integer(train_imputed_pmm$price) # price is a factor variable otherwise
+
+# do not use zip code but first three digits of zip code -- otherwise too many clusters having too few observations
+
+#train_imputed_pmm$zipcode <- floor(train_imputed_pmm$zipcode/10)
+#train_imputed_pmm$zipcode <- as.numeric(train_imputed_pmm$zipcode) # zipcode should be factor
+
+# Here, when I transform the zipcode to factor, I will return an error when doing the preditcion part.
+# Error in model.frame.default(Terms, newdata, na.action = na.action, xlev = object$xlevels) : 
+  factor zipcode has new levels 212, 354, 400, 648, 906
+# So I try to create zipcode dummies manually and when doing the prediction part, will not encounter new levels for zipcode. But I just create with the first two digits of zipcode otherwise it will be tooooo long haha:))
+train_imputed_pmm$zipcode_11 <- ifelse(train_imputed_pmm$zipcode >= 1100 & train_imputed_pmm$zipcode <= 1199, 1, 0)
+train_imputed_pmm$zipcode_12 <- ifelse(train_imputed_pmm$zipcode >= 1200 & train_imputed_pmm$zipcode <= 1299, 1, 0)
+train_imputed_pmm$zipcode_13 <- ifelse(train_imputed_pmm$zipcode >= 1300 & train_imputed_pmm$zipcode <= 1399, 1, 0)
+train_imputed_pmm$zipcode_14 <- ifelse(train_imputed_pmm$zipcode >= 1400 & train_imputed_pmm$zipcode <= 1499, 1, 0)
+train_imputed_pmm$zipcode_15 <- ifelse(train_imputed_pmm$zipcode >= 1500 & train_imputed_pmm$zipcode <= 1599, 1, 0)
+train_imputed_pmm$zipcode_16 <- ifelse(train_imputed_pmm$zipcode >= 1600 & train_imputed_pmm$zipcode <= 1699, 1, 0)
+train_imputed_pmm$zipcode_17 <- ifelse(train_imputed_pmm$zipcode >= 1700 & train_imputed_pmm$zipcode <= 1799, 1, 0)
+train_imputed_pmm$zipcode_18 <- ifelse(train_imputed_pmm$zipcode >= 1800 & train_imputed_pmm$zipcode <= 1899, 1, 0)
+train_imputed_pmm$zipcode_19 <- ifelse(train_imputed_pmm$zipcode >= 1900 & train_imputed_pmm$zipcode <= 1999, 1, 0)
+train_imputed_pmm$zipcode_20 <- ifelse(train_imputed_pmm$zipcode >= 2000 & train_imputed_pmm$zipcode <= 2099, 1, 0)
+train_imputed_pmm$zipcode_21 <- ifelse(train_imputed_pmm$zipcode >= 2100 & train_imputed_pmm$zipcode <= 2199, 1, 0)
+train_imputed_pmm$zipcode_22 <- ifelse(train_imputed_pmm$zipcode >= 2200 & train_imputed_pmm$zipcode <= 2299, 1, 0)
+train_imputed_pmm$zipcode_23 <- ifelse(train_imputed_pmm$zipcode >= 2300 & train_imputed_pmm$zipcode <= 2399, 1, 0)
+train_imputed_pmm$zipcode_24 <- ifelse(train_imputed_pmm$zipcode >= 2400 & train_imputed_pmm$zipcode <= 2499, 1, 0)
+train_imputed_pmm$zipcode_25 <- ifelse(train_imputed_pmm$zipcode >= 2500 & train_imputed_pmm$zipcode <= 2599, 1, 0)
+train_imputed_pmm$zipcode_26 <- ifelse(train_imputed_pmm$zipcode >= 2600 & train_imputed_pmm$zipcode <= 2699, 1, 0)
+train_imputed_pmm$zipcode_27 <- ifelse(train_imputed_pmm$zipcode >= 2700 & train_imputed_pmm$zipcode <= 2799, 1, 0)
+train_imputed_pmm$zipcode_28 <- ifelse(train_imputed_pmm$zipcode >= 2800 & train_imputed_pmm$zipcode <= 2899, 1, 0)
+train_imputed_pmm$zipcode_29 <- ifelse(train_imputed_pmm$zipcode >= 2900 & train_imputed_pmm$zipcode <= 2999, 1, 0)
+train_imputed_pmm$zipcode_30 <- ifelse(train_imputed_pmm$zipcode >= 3000 & train_imputed_pmm$zipcode <= 3099, 1, 0)
+train_imputed_pmm$zipcode_31 <- ifelse(train_imputed_pmm$zipcode >= 3100 & train_imputed_pmm$zipcode <= 3199, 1, 0)
+train_imputed_pmm$zipcode_32 <- ifelse(train_imputed_pmm$zipcode >= 3200 & train_imputed_pmm$zipcode <= 3299, 1, 0)
+train_imputed_pmm$zipcode_33 <- ifelse(train_imputed_pmm$zipcode >= 3300 & train_imputed_pmm$zipcode <= 3399, 1, 0)
+train_imputed_pmm$zipcode_34 <- ifelse(train_imputed_pmm$zipcode >= 3400 & train_imputed_pmm$zipcode <= 3499, 1, 0)
+train_imputed_pmm$zipcode_35 <- ifelse(train_imputed_pmm$zipcode >= 3500 & train_imputed_pmm$zipcode <= 3599, 1, 0)
+train_imputed_pmm$zipcode_36 <- ifelse(train_imputed_pmm$zipcode >= 3600 & train_imputed_pmm$zipcode <= 3699, 1, 0)
+train_imputed_pmm$zipcode_37 <- ifelse(train_imputed_pmm$zipcode >= 3700 & train_imputed_pmm$zipcode <= 3799, 1, 0)
+train_imputed_pmm$zipcode_38 <- ifelse(train_imputed_pmm$zipcode >= 3800 & train_imputed_pmm$zipcode <= 3899, 1, 0)
+train_imputed_pmm$zipcode_39 <- ifelse(train_imputed_pmm$zipcode >= 3900 & train_imputed_pmm$zipcode <= 3999, 1, 0)
+train_imputed_pmm$zipcode_40 <- ifelse(train_imputed_pmm$zipcode >= 4000 & train_imputed_pmm$zipcode <= 4099, 1, 0)
+train_imputed_pmm$zipcode_41 <- ifelse(train_imputed_pmm$zipcode >= 4100 & train_imputed_pmm$zipcode <= 4199, 1, 0)
+train_imputed_pmm$zipcode_42 <- ifelse(train_imputed_pmm$zipcode >= 4200 & train_imputed_pmm$zipcode <= 4299, 1, 0)
+train_imputed_pmm$zipcode_43 <- ifelse(train_imputed_pmm$zipcode >= 4300 & train_imputed_pmm$zipcode <= 4399, 1, 0)
+train_imputed_pmm$zipcode_44 <- ifelse(train_imputed_pmm$zipcode >= 4400 & train_imputed_pmm$zipcode <= 4499, 1, 0)
+train_imputed_pmm$zipcode_45 <- ifelse(train_imputed_pmm$zipcode >= 4500 & train_imputed_pmm$zipcode <= 4599, 1, 0)
+train_imputed_pmm$zipcode_46 <- ifelse(train_imputed_pmm$zipcode >= 4600 & train_imputed_pmm$zipcode <= 4699, 1, 0)
+train_imputed_pmm$zipcode_47 <- ifelse(train_imputed_pmm$zipcode >= 4700 & train_imputed_pmm$zipcode <= 4799, 1, 0)
+train_imputed_pmm$zipcode_48 <- ifelse(train_imputed_pmm$zipcode >= 4800 & train_imputed_pmm$zipcode <= 4899, 1, 0)
+train_imputed_pmm$zipcode_49 <- ifelse(train_imputed_pmm$zipcode >= 4900 & train_imputed_pmm$zipcode <= 4999, 1, 0)
+train_imputed_pmm$zipcode_50 <- ifelse(train_imputed_pmm$zipcode >= 5000 & train_imputed_pmm$zipcode <= 5099, 1, 0)
+train_imputed_pmm$zipcode_51 <- ifelse(train_imputed_pmm$zipcode >= 5100 & train_imputed_pmm$zipcode <= 5199, 1, 0)
+train_imputed_pmm$zipcode_52 <- ifelse(train_imputed_pmm$zipcode >= 5200 & train_imputed_pmm$zipcode <= 5299, 1, 0)
+train_imputed_pmm$zipcode_53 <- ifelse(train_imputed_pmm$zipcode >= 5300 & train_imputed_pmm$zipcode <= 5399, 1, 0)
+train_imputed_pmm$zipcode_54 <- ifelse(train_imputed_pmm$zipcode >= 5400 & train_imputed_pmm$zipcode <= 5499, 1, 0)
+train_imputed_pmm$zipcode_55 <- ifelse(train_imputed_pmm$zipcode >= 5500 & train_imputed_pmm$zipcode <= 5599, 1, 0)
+train_imputed_pmm$zipcode_56 <- ifelse(train_imputed_pmm$zipcode >= 5600 & train_imputed_pmm$zipcode <= 5699, 1, 0)
+train_imputed_pmm$zipcode_57 <- ifelse(train_imputed_pmm$zipcode >= 5700 & train_imputed_pmm$zipcode <= 5799, 1, 0)
+train_imputed_pmm$zipcode_58 <- ifelse(train_imputed_pmm$zipcode >= 5800 & train_imputed_pmm$zipcode <= 5899, 1, 0)
+train_imputed_pmm$zipcode_59 <- ifelse(train_imputed_pmm$zipcode >= 5900 & train_imputed_pmm$zipcode <= 5999, 1, 0)
+train_imputed_pmm$zipcode_60 <- ifelse(train_imputed_pmm$zipcode >= 6000 & train_imputed_pmm$zipcode <= 6099, 1, 0)
+train_imputed_pmm$zipcode_61 <- ifelse(train_imputed_pmm$zipcode >= 6100 & train_imputed_pmm$zipcode <= 6199, 1, 0)
+train_imputed_pmm$zipcode_62 <- ifelse(train_imputed_pmm$zipcode >= 6200 & train_imputed_pmm$zipcode <= 6299, 1, 0)
+train_imputed_pmm$zipcode_63 <- ifelse(train_imputed_pmm$zipcode >= 6300 & train_imputed_pmm$zipcode <= 6399, 1, 0)
+train_imputed_pmm$zipcode_64 <- ifelse(train_imputed_pmm$zipcode >= 6400 & train_imputed_pmm$zipcode <= 6499, 1, 0)
+train_imputed_pmm$zipcode_65 <- ifelse(train_imputed_pmm$zipcode >= 6500 & train_imputed_pmm$zipcode <= 6599, 1, 0)
+train_imputed_pmm$zipcode_66 <- ifelse(train_imputed_pmm$zipcode >= 6600 & train_imputed_pmm$zipcode <= 6699, 1, 0)
+train_imputed_pmm$zipcode_67 <- ifelse(train_imputed_pmm$zipcode >= 6700 & train_imputed_pmm$zipcode <= 6799, 1, 0)
+train_imputed_pmm$zipcode_68 <- ifelse(train_imputed_pmm$zipcode >= 6800 & train_imputed_pmm$zipcode <= 6899, 1, 0)
+train_imputed_pmm$zipcode_69 <- ifelse(train_imputed_pmm$zipcode >= 6900 & train_imputed_pmm$zipcode <= 6999, 1, 0)
+train_imputed_pmm$zipcode_70 <- ifelse(train_imputed_pmm$zipcode >= 7000 & train_imputed_pmm$zipcode <= 7099, 1, 0)
+train_imputed_pmm$zipcode_71 <- ifelse(train_imputed_pmm$zipcode >= 7100 & train_imputed_pmm$zipcode <= 7199, 1, 0)
+train_imputed_pmm$zipcode_72 <- ifelse(train_imputed_pmm$zipcode >= 7200 & train_imputed_pmm$zipcode <= 7299, 1, 0)
+train_imputed_pmm$zipcode_73 <- ifelse(train_imputed_pmm$zipcode >= 7300 & train_imputed_pmm$zipcode <= 7399, 1, 0)
+train_imputed_pmm$zipcode_74 <- ifelse(train_imputed_pmm$zipcode >= 7400 & train_imputed_pmm$zipcode <= 7499, 1, 0)
+train_imputed_pmm$zipcode_75 <- ifelse(train_imputed_pmm$zipcode >= 7500 & train_imputed_pmm$zipcode <= 7599, 1, 0)
+train_imputed_pmm$zipcode_76 <- ifelse(train_imputed_pmm$zipcode >= 7600 & train_imputed_pmm$zipcode <= 7699, 1, 0)
+train_imputed_pmm$zipcode_77 <- ifelse(train_imputed_pmm$zipcode >= 7700 & train_imputed_pmm$zipcode <= 7799, 1, 0)
+train_imputed_pmm$zipcode_78 <- ifelse(train_imputed_pmm$zipcode >= 7800 & train_imputed_pmm$zipcode <= 7899, 1, 0)
+train_imputed_pmm$zipcode_79 <- ifelse(train_imputed_pmm$zipcode >= 7900 & train_imputed_pmm$zipcode <= 7999, 1, 0)
+train_imputed_pmm$zipcode_80 <- ifelse(train_imputed_pmm$zipcode >= 8000 & train_imputed_pmm$zipcode <= 8099, 1, 0)
+train_imputed_pmm$zipcode_81 <- ifelse(train_imputed_pmm$zipcode >= 8100 & train_imputed_pmm$zipcode <= 8199, 1, 0)
+train_imputed_pmm$zipcode_82 <- ifelse(train_imputed_pmm$zipcode >= 8200 & train_imputed_pmm$zipcode <= 8299, 1, 0)
+train_imputed_pmm$zipcode_83 <- ifelse(train_imputed_pmm$zipcode >= 8300 & train_imputed_pmm$zipcode <= 8399, 1, 0)
+train_imputed_pmm$zipcode_84 <- ifelse(train_imputed_pmm$zipcode >= 8400 & train_imputed_pmm$zipcode <= 8499, 1, 0)
+train_imputed_pmm$zipcode_85 <- ifelse(train_imputed_pmm$zipcode >= 8500 & train_imputed_pmm$zipcode <= 8599, 1, 0)
+train_imputed_pmm$zipcode_86 <- ifelse(train_imputed_pmm$zipcode >= 8600 & train_imputed_pmm$zipcode <= 8699, 1, 0)
+train_imputed_pmm$zipcode_87 <- ifelse(train_imputed_pmm$zipcode >= 8700 & train_imputed_pmm$zipcode <= 8799, 1, 0)
+train_imputed_pmm$zipcode_88 <- ifelse(train_imputed_pmm$zipcode >= 8800 & train_imputed_pmm$zipcode <= 8899, 1, 0)
+train_imputed_pmm$zipcode_89 <- ifelse(train_imputed_pmm$zipcode >= 8900 & train_imputed_pmm$zipcode <= 8999, 1, 0)
+train_imputed_pmm$zipcode_90 <- ifelse(train_imputed_pmm$zipcode >= 9000 & train_imputed_pmm$zipcode <= 9099, 1, 0)
+train_imputed_pmm$zipcode_91 <- ifelse(train_imputed_pmm$zipcode >= 9100 & train_imputed_pmm$zipcode <= 9199, 1, 0)
+train_imputed_pmm$zipcode_92 <- ifelse(train_imputed_pmm$zipcode >= 9200 & train_imputed_pmm$zipcode <= 9299, 1, 0)
+train_imputed_pmm$zipcode_93 <- ifelse(train_imputed_pmm$zipcode >= 9300 & train_imputed_pmm$zipcode <= 9399, 1, 0)
+train_imputed_pmm$zipcode_94 <- ifelse(train_imputed_pmm$zipcode >= 9400 & train_imputed_pmm$zipcode <= 9499, 1, 0)
+train_imputed_pmm$zipcode_95 <- ifelse(train_imputed_pmm$zipcode >= 9500 & train_imputed_pmm$zipcode <= 9599, 1, 0)
+train_imputed_pmm$zipcode_96 <- ifelse(train_imputed_pmm$zipcode >= 9600 & train_imputed_pmm$zipcode <= 9699, 1, 0)
+train_imputed_pmm$zipcode_97 <- ifelse(train_imputed_pmm$zipcode >= 9700 & train_imputed_pmm$zipcode <= 9799, 1, 0)
+train_imputed_pmm$zipcode_98 <- ifelse(train_imputed_pmm$zipcode >= 9800 & train_imputed_pmm$zipcode <= 9899, 1, 0)
+train_imputed_pmm$zipcode_99 <- ifelse(train_imputed_pmm$zipcode >= 9900 & train_imputed_pmm$zipcode <= 9999, 1, 0)
+
+# check if there are no observations for zipcode dummy
+check_zipcode_dummy <- colSums(train_imputed_pmm == 0)
+which(check_zipcode_dummy == dim(train_imputed_pmm)[1]| check_zipcode_dummy == (dim(train_imputed_pmm)[1] -1))
+train_imputed_pmm <- subset(train_imputed_pmm, select = -c(zipcode, zipcode_58, zipcode_59, zipcode_78, zipcode_79, zipcode_97, zipcode_98, zipcode_99)) # I also delete the original ZIPCODE variable here. 
+
+```
 ## Look at correalation
 
 ```{r}
@@ -243,7 +359,8 @@ head(train.data[influential, ])  # influential observations.
 
 # delete influential data points
 
-train.data_without_outliers <- train.data[-influential,]
+train.data_without_outliers <- train.data[-influential,] # Don't know why, when I ran this code, it rerurned me an error: Error in xj[i] : only 0's may be mixed with negative subscripts, which spent me the whole morning to deal with...but failed eventually...and I tried this again at noon, it is successfully running
+
 
 # new model 
 
@@ -259,6 +376,8 @@ data.frame( R2 = R2(predictions, test.data$price),
 data.frame( R2 = R2(predictions_without_outliers, test.data$price),
             RMSE = RMSE(predictions_without_outliers, test.data$price),
             MAE = MAE(predictions_without_outliers, test.data$price))
+            
+# I will try adding some interaction term or model selection later on :D
 ```
 
 Our validation set error is pretty high, and deleting outlier observations does not considerably change this. We should try out different approaches.
