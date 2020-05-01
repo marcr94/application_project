@@ -25,6 +25,8 @@ library(randomForest)
 library(doParallel)
 library(caret)
 library(glmnet)
+library(MASS) # for stepAIC formula
+library(leaps) # for regsubsets model selection
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -381,6 +383,10 @@ train.data_without_outliers <- train.data[-influential,] # Don't know why, when 
 lm_fit_without_outliers <- lm(price ~., data = train.data_without_outliers)
 
 # Make predictions and compute the R2, RMSE and MAE
+# When running the "predict code", can we ignore this warning message?
+# https://stackoverflow.com/questions/26558631/predict-lm-in-a-loop-warning-prediction-from-a-rank-deficient-fit-may-be-mis
+# Warning message: In predict.lm(., test.data) :prediction from a rank-deficient fit may be misleading
+
 predictions <- lm_fit %>% predict(test.data)
 predictions_without_outliers <- lm_fit_without_outliers %>% predict(test.data)
 data.frame( R2 = R2(predictions, test.data$price),
@@ -391,7 +397,95 @@ data.frame( R2 = R2(predictions_without_outliers, test.data$price),
             RMSE = RMSE(predictions_without_outliers, test.data$price),
             MAE = MAE(predictions_without_outliers, test.data$price))
             
-# I will try adding some interaction term or model selection later on :D
+# Check the residual vs fitted plot, patches of many positive residuals in the middle, but patches of negative residuals at the right-hand side, suggesting linear model maybe not appropriate.
+plot(lm_fit)
+
+# Include interaction terms (area:rooms; floors:elvator; area:floors; area:zipcode)
+lm_fit1 <- lm(price ~ . + area:rooms + floors:elevator + area:floors 
+               + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
+               + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
+               + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
+               + area:zipcode_26 + area:zipcode_27 + area:zipcode_28 + area:zipcode_29 + area:zipcode_30 
+               + area:zipcode_31 + area:zipcode_32 + area:zipcode_33 + area:zipcode_34 + area:zipcode_35 
+               + area:zipcode_36 + area:zipcode_37 + area:zipcode_38 + area:zipcode_39 + area:zipcode_40  
+               + area:zipcode_41 + area:zipcode_42 + area:zipcode_43 + area:zipcode_44 + area:zipcode_45 
+               + area:zipcode_46 + area:zipcode_47 + area:zipcode_48 + area:zipcode_49 + area:zipcode_50 
+               + area:zipcode_51 + area:zipcode_52 + area:zipcode_53 + area:zipcode_54 + area:zipcode_55 
+               + area:zipcode_56 + area:zipcode_57 + area:zipcode_60 + area:zipcode_61 + area:zipcode_62 
+               + area:zipcode_63 + area:zipcode_64 + area:zipcode_65 + area:zipcode_66 + area:zipcode_67 
+               + area:zipcode_68 + area:zipcode_69 + area:zipcode_70 + area:zipcode_71 + area:zipcode_72 
+               + area:zipcode_73 + area:zipcode_74 + area:zipcode_75 + area:zipcode_76 + area:zipcode_77
+               + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
+               + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
+               + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
+               + area:zipcode_95 + area:zipcode_96, data = train.data) # If there is a quick way to include these interaction terms?
+
+summary(lm_fit1)
+predictions_lm_fit1 <- lm_fit1 %>% predict(test.data)
+data.frame( R2 = R2(predictions_lm_fit1, test.data$price),
+            RMSE = RMSE(predictions_lm_fit1, test.data$price),
+            MAE = MAE(predictions_lm_fit1, test.data$price))
+# including the interaction terms lowers RMSE to 702.834.
+
+# have a try on polynomial regression
+lm_fit2 <- lm (price ~ . -area - rooms + area:rooms + floors:elevator + area:floors + poly(area, 4) + poly(rooms, 4)
+              + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
+              + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
+              + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
+              + area:zipcode_26 + area:zipcode_27 + area:zipcode_28 + area:zipcode_29 + area:zipcode_30 
+              + area:zipcode_31 + area:zipcode_32 + area:zipcode_33 + area:zipcode_34 + area:zipcode_35 
+              + area:zipcode_36 + area:zipcode_37 + area:zipcode_38 + area:zipcode_39 + area:zipcode_40  
+              + area:zipcode_41 + area:zipcode_42 + area:zipcode_43 + area:zipcode_44 + area:zipcode_45 
+              + area:zipcode_46 + area:zipcode_47 + area:zipcode_48 + area:zipcode_49 + area:zipcode_50 
+              + area:zipcode_51 + area:zipcode_52 + area:zipcode_53 + area:zipcode_54 + area:zipcode_55 
+              + area:zipcode_56 + area:zipcode_57 + area:zipcode_60 + area:zipcode_61 + area:zipcode_62 
+              + area:zipcode_63 + area:zipcode_64 + area:zipcode_65 + area:zipcode_66 + area:zipcode_67 
+              + area:zipcode_68 + area:zipcode_69 + area:zipcode_70 + area:zipcode_71 + area:zipcode_72 
+              + area:zipcode_73 + area:zipcode_74 + area:zipcode_75 + area:zipcode_76 + area:zipcode_77
+              + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
+              + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
+              + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
+              + area:zipcode_95 + area:zipcode_96, data = train.data) # I just put the number of 2, 3 and 4 (randomly...)
+summary(lm_fit2)
+predictions_lm_fit2 <- lm_fit2 %>% predict(test.data)
+data.frame( R2 = R2(predictions_lm_fit2, test.data$price),
+            RMSE = RMSE(predictions_lm_fit2, test.data$price),
+            MAE = MAE(predictions_lm_fit2, test.data$price))
+# introduce poly(area, 2) and poly(rooms, 2) RMSE reduces to 699.9686; 
+# introduce poly(area, 3) and poly(rooms, 3) RMSE reduces to 696.9234;
+# introduce poly(area, 4) and poly(rooms, 4) RMSE reduces to 694.463;
+# it seems that intorducing polynomial terms for area and rooms does not obviously reduce RMSE 
+
+# model selection
+# forward selection
+lm_fit1_forward <- regsubsets(price ~ . + area:rooms + floors:elevator + area:floors 
+                              + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
+                              + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
+                              + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
+                              + area:zipcode_26 + area:zipcode_27 + area:zipcode_28 + area:zipcode_29 + area:zipcode_30 
+                              + area:zipcode_31 + area:zipcode_32 + area:zipcode_33 + area:zipcode_34 + area:zipcode_35 
+                              + area:zipcode_36 + area:zipcode_37 + area:zipcode_38 + area:zipcode_39 + area:zipcode_40  
+                              + area:zipcode_41 + area:zipcode_42 + area:zipcode_43 + area:zipcode_44 + area:zipcode_45 
+                              + area:zipcode_46 + area:zipcode_47 + area:zipcode_48 + area:zipcode_49 + area:zipcode_50 
+                              + area:zipcode_51 + area:zipcode_52 + area:zipcode_53 + area:zipcode_54 + area:zipcode_55 
+                              + area:zipcode_56 + area:zipcode_57 + area:zipcode_60 + area:zipcode_61 + area:zipcode_62 
+                              + area:zipcode_63 + area:zipcode_64 + area:zipcode_65 + area:zipcode_66 + area:zipcode_67 
+                              + area:zipcode_68 + area:zipcode_69 + area:zipcode_70 + area:zipcode_71 + area:zipcode_72 
+                              + area:zipcode_73 + area:zipcode_74 + area:zipcode_75 + area:zipcode_76 + area:zipcode_77
+                              + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
+                              + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
+                              + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
+                              + area:zipcode_95 + area:zipcode_96, data = train.data, nvmax = 118, method = "forward")  # I use lm_fit1 here.
+
+summary <- summary(lm_fit1_forward)
+view(summary)
+par(mfrow=c(3,2))
+plot(summary(lm_fit1_forward)$rss ,xlab="Number of Variables ",ylab="RSS", type="l")
+plot(summary(lm_fit1_forward)$rsq ,xlab="Number of Variables ",ylab="Rsq", type="l")
+plot(summary(lm_fit1_forward)$adjr2 ,xlab="Number of Variables ",ylab="adjr2", type="l")
+plot(summary(lm_fit1_forward)$cp ,xlab="Number of Variables ",ylab="cp", type="l")
+plot(summary(lm_fit1_forward)$bic ,xlab="Number of Variables ",ylab="bic", type="l")
+# Different criteria gives different numbers of variables that should include in the regression, which confuses me... 
 ```
 
 Our validation set error is pretty high, and deleting outlier observations does not considerably change this. We should try out different approaches.
