@@ -138,8 +138,8 @@ train_without_dummyNA <- train_without_dummyNA %>% filter(is.na(year_built) | ye
 ```{r}
 
 # var format transformations
-train_imputed_pmm$price <- sub(pattern = "CHF", replacement = "", train_imputed_pmm$price)
-train_imputed_pmm$price <- as.numeric(train_imputed_pmm$price) # price is a factor variable otherwise
+train_without_dummyNA$price <- sub(pattern = "CHF", replacement = "", train_without_dummyNA$price)
+train_without_dummyNA$price <- as.numeric(train_without_dummyNA$price) # price is a factor variable otherwise
 
 # do not use zip code but first two digits of zip code -- otherwise too many clusters having too few observations
 
@@ -519,10 +519,10 @@ lasso.coef <- predict(out, type = "coefficients", s= bestlam)[1:20,]
 lasso.coef[lasso.coef != 0]
 
 ## lasso with interaction terms
-lasso_y <- as.numeric(lasso_y)
-lasso_interact <- hierNet(lasso_x, lasso_y, lam = bestlam)
-lasso_interact_testyhat <- predict(lasso_interact, newx = test_x)
-mean((test_x - lasso_interact_testyhat)^2)
+#lasso_y <- as.numeric(lasso_y)
+#lasso_interact <- hierNet(lasso_x, lasso_y, lam = bestlam)
+#lasso_interact_testyhat <- predict(lasso_interact, newx = test_x)
+#mean((test_x - lasso_interact_testyhat)^2)
 
 # no good...
 
