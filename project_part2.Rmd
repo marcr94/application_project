@@ -28,6 +28,7 @@ library(glmnet)
 library(MASS) # for stepAIC formula
 library(leaps) # for regsubsets model selection
 library(tree)
+library(corrplot)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -119,6 +120,8 @@ dummy_cols <- c("balcony", "basement", "bath_tube", "building_plot", "cabletv", 
 train_without_dummyNA <- train_data %>% mutate_at(.vars = dummy_cols, .funs = funs(ifelse(is.na(.), 0, .)))
 
 apply(train_without_dummyNA,2, pMiss)
+
+train_without_dummyNA
 ```
 
 Let us check for some specific numeric variables, if there are some significant outliers in the dataset.
@@ -140,6 +143,7 @@ train_without_dummyNA <- train_without_dummyNA %>% filter(is.na(year_built) | ye
 # var format transformations
 train_without_dummyNA$price <- sub(pattern = "CHF", replacement = "", train_without_dummyNA$price)
 train_without_dummyNA$price <- as.numeric(train_without_dummyNA$price) # price is a factor variable otherwise
+train_without_dummyNA$price <- scale(train_without_dummyNA$price)[,1] # price is a factor variable otherwise
 
 # do not use zip code but first two digits of zip code -- otherwise too many clusters having too few observations
 
@@ -327,7 +331,16 @@ lines(density(train_imputed_pmm$year_built), col = "red")
 lines(density(train_imputed_norm$year_built), col = "green")
 lines(density(train_imputed_rf$year_built), col = "blue")
 
+train_forcorr <- cor(train_imputed_pmm %>% keep(is.numeric) %>% dplyr::select(-starts_with("zipcode")))
+corrplot(train_forcorr, method = "circle")
+
+train_forcorr <- cor(train_imputed_norm %>% keep(is.numeric) %>% dplyr::select(-starts_with("zipcode")))
+corrplot(train_forcorr, method = "circle")
+
+train_forcorr <- cor(train_imputed_rf %>% keep(is.numeric) %>% dplyr::select(-starts_with("zipcode")))
+corrplot(train_forcorr, method = "circle")
 ```
+
 ## Look at correalation
 
 ```{r}
@@ -340,7 +353,7 @@ plot(train_imputed_pmm$rooms, train_imputed_pmm$price) # no relationship detecta
 
 plot(train_imputed_pmm$year, train_imputed_pmm$price) # no relationship detectable
 
-plot(train_imputed_pmm$year_built, train_imputed_pmm$price) # no relationship detectable
+plot(train_imputed_pmm$year_built, train_imputed_pmm$price) # quadratic/exponential ??
 ```
 
 Really hard to detect any relationship, for example to use polynomials in linear regression.
