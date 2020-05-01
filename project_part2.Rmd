@@ -27,6 +27,7 @@ library(caret)
 library(glmnet)
 library(MASS) # for stepAIC formula
 library(leaps) # for regsubsets model selection
+library(tree)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -123,7 +124,7 @@ apply(train_without_dummyNA,2, pMiss)
 Let us check for some specific numeric variables, if there are some significant outliers in the dataset.
 
 ```{r}
-plot(train_without_dummyNA$area) # not real outliers #but when check manually some observations with area=1, which does not make sense...
+plot(train_without_dummyNA$area) # not real outliers,but when check manually some observations with area=1, which does not make sense...
 plot(train_without_dummyNA$floors) # not real outliers
 plot(train_without_dummyNA$price) # not real outliers
 plot(train_without_dummyNA$rooms) # not real outliers
@@ -245,10 +246,8 @@ train_without_dummyNA <- subset(train_without_dummyNA, select = -c(id,
                                                                    date, # date of ad publishment should not matter
                                                                    date_available, # too sparse information
                                                                    municipality, # we have zip code
+                                                                   sale, # only contains 1's
                                                                    street)) # again, we use zip code
-apply(train_without_dummyNA,2, pMiss)
-
-
 
 ```
 
@@ -259,7 +258,7 @@ Now we cleaned quite some parts from the dataset . We still have area, floors, r
 https://stats.stackexchange.com/questions/219013/how-do-the-number-of-imputations-the-maximum-iterations-affect-accuracy-in-mul
 
 --> Informative stackoverflow about imputation methods in mice. 
-Although with multiple imputed data sets we would reach better accuracy, it is only advisable to use multiple imputed data sets assuming we have a linera 
+Although with multiple imputed data sets we would reach better accuracy, it is only advisable to use multiple imputed data sets assuming we have a linear relationship.
 
 
 ```{r}
@@ -427,6 +426,9 @@ data.frame( R2 = R2(predictions_lm_fit1, test.data$price),
             MAE = MAE(predictions_lm_fit1, test.data$price))
 # including the interaction terms lowers RMSE to 702.834.
 
+plot(lm_fit1)
+# there is some serious leverage from a couple data points 
+
 # have a try on polynomial regression
 lm_fit2 <- lm (price ~ . -area - rooms + area:rooms + floors:elevator + area:floors + poly(area, 4) + poly(rooms, 4)
               + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
@@ -456,6 +458,7 @@ data.frame( R2 = R2(predictions_lm_fit2, test.data$price),
 # introduce poly(area, 4) and poly(rooms, 4) RMSE reduces to 694.463;
 # it seems that intorducing polynomial terms for area and rooms does not obviously reduce RMSE 
 
+plot(lm_fit2)
 # model selection
 # forward selection
 lm_fit1_forward <- regsubsets(price ~ . + area:rooms + floors:elevator + area:floors 
@@ -514,8 +517,30 @@ out <- glmnet(lasso_x, lasso_y, alpha = 1)
 lasso.coef <- predict(out, type = "coefficients", s= bestlam)[1:20,]
  
 lasso.coef[lasso.coef != 0]
+
+## lasso with interaction terms
+lasso_y <- as.numeric(lasso_y)
+lasso_interact <- hierNet(lasso_x, lasso_y, lam = bestlam)
+lasso_interact_testyhat <- predict(lasso_interact, newx = test_x)
+mean((test_x - lasso_interact_testyhat)^2)
+
+# no good...
+
 ```
-Our lasso model has the advantage that there is only 15 predictors left which are used for computing the estimates. However, our MSE is huge - some orders of magnitude higher than the error for the linear model.
+Our lasso model has the advantage that there is only 15 predictors left which are used for computing the estimates. Also , our LASSO Model has the best RMSE so far. 
+
+## Walking into the forest for some qualitree times
+
+```{r}
+set.seed(1)
+
+tree_fit <- tree(price ~. , data = train.data)
+cv_tree <- cv.tree(tree_fit)
+tree_testyhat <- predict(tree_fit, newdata = test.data)
+mean((test.data$price - tree_testyhat)^2)
+
+```
+
 
 ## Imputation of the test dataset .
 
