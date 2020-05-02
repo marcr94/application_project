@@ -29,6 +29,9 @@ library(MASS) # for stepAIC formula
 library(leaps) # for regsubsets model selection
 library(tree)
 library(corrplot)
+library(splines)
+library(foreach)
+library(gam)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -506,6 +509,26 @@ plot(summary(lm_fit1_forward)$bic ,xlab="Number of Variables ",ylab="bic", type=
 
 Our validation set error is pretty high, and deleting outlier observations does not considerably change this. We should try out different approaches.
 
+## Moing to nonlinearity: Smooth Spline and GAM
+
+```{r}
+# Smoothing spline for rooms
+room.fit <- smooth.spline(train.data$rooms, train.data$price, cv=TRUE)
+room.fit$df
+
+floors.fit <- smooth.spline(train.data$floors, train.data$price, cv=TRUE)
+floors.fit$df
+
+area.fit <- smooth.spline(train.data$area, train.data$price, cv=TRUE)
+area.fit$df
+
+# gam without interaction terms
+gam.m0 <- gam(price ~ . - area + s(area, area.fit$df) - floors + s(floors, floors.fit$df) - rooms + s(rooms, room.fit$df), data = train.data)
+gam.m0_pred <- gam.m0 %>% predict(test.data)
+data.frame( R2 = R2(gam.m0_pred, test.data$price),
+            RMSE = RMSE(gam.m0_pred, test.data$price),
+            MAE = MAE(gam.m0_pred, test.data$price))
+```
 
 ## Moving to LASSO
 Our data has quite some variables. Especially as we redifined NA's to 0 in the case of dummy variables and imputed the other ones, this can introduce bias. Also, we do not want our model to get into the trap of what is known as "the curse of dimensionality". One way to work against this is to build a LASSO Model - which is designed to force coefficients to get exactly zero. This way, we might be able to drop some variables which do not have good explanational power.
