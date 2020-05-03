@@ -544,16 +544,53 @@ data.frame( R2 = R2(gam.m0_pred, test.data$price),
             MAE = MAE(gam.m0_pred, test.data$price))
 ```
 
-## Moving to LASSO
+## Moving to Ridge, LASSO and Elastic-net regression
 Our data has quite some variables. Especially as we redifined NA's to 0 in the case of dummy variables and imputed the other ones, this can introduce bias. Also, we do not want our model to get into the trap of what is known as "the curse of dimensionality". One way to work against this is to build a LASSO Model - which is designed to force coefficients to get exactly zero. This way, we might be able to drop some variables which do not have good explanational power.
 
 ```{r}
+# need to find optimal alpha and lambda
+# code from: https://github.com/StatQuest/ridge_lasso_elastic_net_demo/blob/master/ridge_lass_elastic_net_demo.R
 # reform X (training and test) and Y training for lasso input
-lasso_x <- model.matrix(price ~., train.data)[,-1]
-lasso_y <- train.data$price
+train_x <- model.matrix(price ~., train.data)[,-1]
+train_y <- train.data$price
 
 test_x <- model.matrix(price ~., test.data)[,-1]
 test_y <- test.data$price
+
+# alpha = 0, Ridge Regression; alpha = 1, Lasso; alpha = 0-1, combine ridge and lasso: Elastic-net regression
+set.seed(1)
+list.of.fits <- list()
+for (i in 0:10) {
+  fit.name <- paste0("alpha", i/10)
+  
+  list.of.fits[[fit.name]] <-
+    cv.glmnet(train_x, train_y, type.measure="mse", alpha=i/10, 
+      family="gaussian")
+}
+
+results <- data.frame()
+for (i in 0:10) {
+  fit.name <- paste0("alpha", i/10)
+  
+  predicted <- 
+    predict(list.of.fits[[fit.name]], 
+      s=list.of.fits[[fit.name]]$lambda.min, newx=test_x)
+  
+  mse <- mean((test_y - predicted)^2)
+  
+  temp <- data.frame(alpha=i/10, mse=mse, fit.name=fit.name)
+  results <- rbind(results, temp)
+}
+
+# from results, we can see Lasso (alpha = 1) performs best.
+lasso_fit <- cv.glmnet(train_x, train_y, type.measure="mse", 
+  alpha=1, family="gaussian")
+
+lasso_predicted <- predict(lasso_fit, s=lasso_fit$lambda.min, newx = test_x)
+
+sqrt(mean((test_y - lasso_predicted)^2))
+
+
 # fit model 
 
 lasso_fit <- glmnet(lasso_x, lasso_y, alpha = 1)
@@ -582,6 +619,7 @@ Our lasso model has the advantage that there is only 15 predictors left which ar
 ## Walking into the forest for some qualitree times
 
 ```{r}
+# Fitting regression tree
 set.seed(1)
 
 tree_fit <- tree(price ~. , data = train.data)
@@ -589,6 +627,21 @@ cv_tree <- cv.tree(tree_fit)
 tree_testyhat <- predict(tree_fit, newdata = test.data)
 mean((test.data$price - tree_testyhat)^2)
 
+# Random forest
+# code from: https://github.com/StatQuest/random_forest_demo/blob/master/random_forest_demo.R
+
+set.seed(1)
+rf_fit <- randomForest(price ~ . , data = train.data, mtry = 3, ntree = 25, proximity = TRUE) #Here use default mrty and ntree, but it seems I don't have enough memory for rf, always returns error: cannot allocate vector of size 5.8 Gb
+
+# find optimal value of mtry or ntree, here i input ntree = 25
+oob.values <- vector(length = 10)
+for (i in 1:10){
+  temp.model <- randomForest(price ~ ., data = train.data, mtry = i, ntree = 25)
+  oob.values[i] <- temp.model$err.rate[nrow(temp.model$err.rate), 1]
+}
+
+rf_testyhat <- predict(rf_fit, newdata = test.data)
+sqrt(mean((test.data$price - rf_testyhat)^2))
 ```
 
 
