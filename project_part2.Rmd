@@ -32,6 +32,7 @@ library(corrplot)
 library(splines)
 library(foreach)
 library(gam)
+library(boot) 
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -460,7 +461,84 @@ plot(lm_fit1)
 # there is some serious leverage from a couple data points 
 
 # have a try on polynomial regression
-lm_fit2 <- lm (price ~ . -area - rooms + area:rooms + floors:elevator + area:floors + poly(area, 4) + poly(rooms, 4)
+# First, check which degree of polynomial to choose
+set.seed(1)
+# for area
+cv.error.area <- rep(0,5)
+for (i in 1:5) {
+  fit_area <- glm(price ~ . + area:rooms + floors:elevator + area:floors - area  + poly(area,df = i)
+             + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
+              + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
+              + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
+              + area:zipcode_26 + area:zipcode_27 + area:zipcode_28 + area:zipcode_29 + area:zipcode_30 
+              + area:zipcode_31 + area:zipcode_32 + area:zipcode_33 + area:zipcode_34 + area:zipcode_35 
+              + area:zipcode_36 + area:zipcode_37 + area:zipcode_38 + area:zipcode_39 + area:zipcode_40  
+              + area:zipcode_41 + area:zipcode_42 + area:zipcode_43 + area:zipcode_44 + area:zipcode_45 
+              + area:zipcode_46 + area:zipcode_47 + area:zipcode_48 + area:zipcode_49 + area:zipcode_50 
+              + area:zipcode_51 + area:zipcode_52 + area:zipcode_53 + area:zipcode_54 + area:zipcode_55 
+              + area:zipcode_56 + area:zipcode_57 + area:zipcode_60 + area:zipcode_61 + area:zipcode_62 
+              + area:zipcode_63 + area:zipcode_64 + area:zipcode_65 + area:zipcode_66 + area:zipcode_67 
+              + area:zipcode_68 + area:zipcode_69 + area:zipcode_70 + area:zipcode_71 + area:zipcode_72 
+              + area:zipcode_73 + area:zipcode_74 + area:zipcode_75 + area:zipcode_76 + area:zipcode_77
+              + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
+              + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
+              + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
+              + area:zipcode_95 + area:zipcode_96, data = train.data)
+  cv.error.5[i] <- cv.glm(train.data, fit_area, K = 5)$delta[1]
+}
+plot(cv.error.area, xlab = "Degrees of polynomial for area", ylab = "Cross-validation error", type = "b", col = "blue") # we set degrees of polynomial for area as 4
+
+# for floors
+cv.error.floors <- rep(0,5)
+for (i in 1:5) {
+  fit_floors <- glm(price ~ . + area:rooms + floors:elevator + area:floors - floors  + poly(floors,df = i)
+             + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
+              + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
+              + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
+              + area:zipcode_26 + area:zipcode_27 + area:zipcode_28 + area:zipcode_29 + area:zipcode_30 
+              + area:zipcode_31 + area:zipcode_32 + area:zipcode_33 + area:zipcode_34 + area:zipcode_35 
+              + area:zipcode_36 + area:zipcode_37 + area:zipcode_38 + area:zipcode_39 + area:zipcode_40  
+              + area:zipcode_41 + area:zipcode_42 + area:zipcode_43 + area:zipcode_44 + area:zipcode_45 
+              + area:zipcode_46 + area:zipcode_47 + area:zipcode_48 + area:zipcode_49 + area:zipcode_50 
+              + area:zipcode_51 + area:zipcode_52 + area:zipcode_53 + area:zipcode_54 + area:zipcode_55 
+              + area:zipcode_56 + area:zipcode_57 + area:zipcode_60 + area:zipcode_61 + area:zipcode_62 
+              + area:zipcode_63 + area:zipcode_64 + area:zipcode_65 + area:zipcode_66 + area:zipcode_67 
+              + area:zipcode_68 + area:zipcode_69 + area:zipcode_70 + area:zipcode_71 + area:zipcode_72 
+              + area:zipcode_73 + area:zipcode_74 + area:zipcode_75 + area:zipcode_76 + area:zipcode_77
+              + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
+              + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
+              + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
+              + area:zipcode_95 + area:zipcode_96, data = train.data)
+  cv.error.5[i] <- cv.glm(train.data, fit_floors, K = 5)$delta[1]
+}
+plot(cv.error.floors, xlab = "Degrees of polynomial for floors", ylab = "Cross-validation error", type = "b", col = "blue") # we set degrees of polynomial for floors as 3
+
+# for floors
+cv.error.rooms <- rep(0,5)
+for (i in 1:5) {
+  fit_rooms <- glm(price ~ . + area:rooms + floors:elevator + area:floors - rooms  + poly(rooms,df = i)
+             + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
+              + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
+              + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
+              + area:zipcode_26 + area:zipcode_27 + area:zipcode_28 + area:zipcode_29 + area:zipcode_30 
+              + area:zipcode_31 + area:zipcode_32 + area:zipcode_33 + area:zipcode_34 + area:zipcode_35 
+              + area:zipcode_36 + area:zipcode_37 + area:zipcode_38 + area:zipcode_39 + area:zipcode_40  
+              + area:zipcode_41 + area:zipcode_42 + area:zipcode_43 + area:zipcode_44 + area:zipcode_45 
+              + area:zipcode_46 + area:zipcode_47 + area:zipcode_48 + area:zipcode_49 + area:zipcode_50 
+              + area:zipcode_51 + area:zipcode_52 + area:zipcode_53 + area:zipcode_54 + area:zipcode_55 
+              + area:zipcode_56 + area:zipcode_57 + area:zipcode_60 + area:zipcode_61 + area:zipcode_62 
+              + area:zipcode_63 + area:zipcode_64 + area:zipcode_65 + area:zipcode_66 + area:zipcode_67 
+              + area:zipcode_68 + area:zipcode_69 + area:zipcode_70 + area:zipcode_71 + area:zipcode_72 
+              + area:zipcode_73 + area:zipcode_74 + area:zipcode_75 + area:zipcode_76 + area:zipcode_77
+              + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
+              + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
+              + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
+              + area:zipcode_95 + area:zipcode_96, data = train.data)
+  cv.error.rooms[i] <- cv.glm(train.data, fit_rooms, K = 5)$delta[1]
+}
+plot(cv.error.rooms, xlab = "Degrees of polynomial for rooms", ylab = "Cross-validation error", type = "b", col = "blue") # we set degrees of polynomial for rooms as 5
+
+lm_fit2 <- lm (price ~ . -area - floors - rooms + area:rooms + floors:elevator + area:floors + poly(area, 4) + poly(floors, 3) +poly(rooms, 5)
               + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
               + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
               + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
@@ -477,18 +555,14 @@ lm_fit2 <- lm (price ~ . -area - rooms + area:rooms + floors:elevator + area:flo
               + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
               + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
               + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
-              + area:zipcode_95 + area:zipcode_96, data = train.data) # I just put the number of 2, 3 and 4 (randomly...)
+              + area:zipcode_95 + area:zipcode_96, data = train.data) 
+
 summary(lm_fit2)
 predictions_lm_fit2 <- lm_fit2 %>% predict(test.data)
 data.frame( R2 = R2(predictions_lm_fit2, test.data$price),
             RMSE = RMSE(predictions_lm_fit2, test.data$price),
             MAE = MAE(predictions_lm_fit2, test.data$price))
-# introduce poly(area, 2) and poly(rooms, 2) RMSE reduces to 699.9686; 
-# introduce poly(area, 3) and poly(rooms, 3) RMSE reduces to 696.9234;
-# introduce poly(area, 4) and poly(rooms, 4) RMSE reduces to 694.463;
-# it seems that intorducing polynomial terms for area and rooms does not obviously reduce RMSE 
 
-plot(lm_fit2)
 # model selection
 # forward selection
 lm_fit1_forward <- regsubsets(price ~ . + area:rooms + floors:elevator + area:floors 
