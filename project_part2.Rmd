@@ -11,7 +11,11 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Set up work space
+## Data Pre-Processing
+
+# Set up work space
+
+We tidy up our environment, load some packages that we are gonna use later on and load our train and test data.
 
 ```{r}
 
@@ -33,6 +37,7 @@ library(splines)
 library(foreach)
 library(gam)
 library(boot) 
+library(ranger)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -43,13 +48,13 @@ X_test <- read.csv("./X_test.csv")
 
 ```
 
-## Overview our data
+# Overview our data
 
 Let's have a look at our data. We have no data set information/fact sheet so we will have to figure out the content ourselves...
 
 ```{r, echo=FALSE}
-#head(train_data)
 
+head(train_data)
 summary(train_data)
 
 ```
@@ -102,20 +107,24 @@ We have the following columns:
   + veranda
   + wheelchair
 
+
+# Data Cleaning
+
+
 ```{r}
-# code from https://www.r-bloggers.com/imputing-missing-data-with-r-mice-package/
+# code adapted from https://www.r-bloggers.com/imputing-missing-data-with-r-mice-package/ for easy missing proportion checking
 
 pMiss <- function(x){sum(is.na(x))/length(x)*100}
 apply(train_data,2, pMiss)
 ```
 
-This looks... bad ..^^
+This looks very bad! 
 
-Leaving out all rows with missing data is not an option, as it would leave us with pretty much no data (and for additional reasons like possible bias - the data is most likely not missing completely at random).
+Leaving out all rows with missing data is not an option, as it would leave us with pretty much no data, and additionally it would possible introduce bias - the data is most likely not missing completely at random.
 
 One major problem: our dummy variable all only contain ones and NA's. This way, we have no way of knowing which of the NA's are actually NA's and which are 0s.
 
-First approach: Coding all NA's in dummy vars to 0. New meaning of predictor: not "does have ..." but "characteristic ... is mentioned".
+Approach: Coding all NA's in dummy vars to 0. New meaning of predictor: not "does have ..." but "characteristic ... is mentioned".
 
 ```{r}
 
@@ -125,30 +134,30 @@ train_without_dummyNA <- train_data %>% mutate_at(.vars = dummy_cols, .funs = fu
 
 apply(train_without_dummyNA,2, pMiss)
 
-train_without_dummyNA
 ```
 
 Let us check for some specific numeric variables, if there are some significant outliers in the dataset.
 
 ```{r}
-plot(train_without_dummyNA$area) # not real outliers,but when check manually some observations with area=1, which does not make sense...but we have them in test data
-
-plot(train_without_dummyNA$floors) # not real outliers
-plot(train_without_dummyNA$price) # not real outliers
-plot(train_without_dummyNA$rooms) # not real outliers
+plot(train_without_dummyNA$area) # not real outliers,but when check manually some observations with area=1
+plot(train_without_dummyNA$floors) # no real outliers
+plot(train_without_dummyNA$price) # no real outliers
+plot(train_without_dummyNA$rooms) # no real outliers
 plot(train_without_dummyNA$year_built) # we could delete the obs. from 1200
 
 train_without_dummyNA <- train_without_dummyNA %>% filter(is.na(year_built) | year_built >=1300) # deletes 4 obs.
 ```
+The observations with area = 1 do not really make sense...but we have area = 1 obs. in the test data too, so we will keep them.
 
-## Further Adjustments
+We delete 4 observations, which have values of year_built before 1300. They might distort our relationship, and we do not have observations with year_built  > 1300 in the test data, so it will be save to delete them.
+
 
 ```{r}
 
 # var format transformations
+
 train_without_dummyNA$price <- sub(pattern = "CHF", replacement = "", train_without_dummyNA$price)
 train_without_dummyNA$price <- as.numeric(train_without_dummyNA$price) # price is a factor variable otherwise
-train_without_dummyNA$price <- scale(train_without_dummyNA$price)[,1] # price is a factor variable otherwise
 
 # do not use zip code but first two digits of zip code -- otherwise too many clusters having too few observations
 
@@ -262,12 +271,18 @@ train_without_dummyNA <- subset(train_without_dummyNA, select = -c(id,
 
 Now we cleaned quite some parts from the dataset . We still have area, floors, rooms and year_built with missing data. For these variables, we will use the mice package to impute them.
 
+
 ## Imputation Part
 
-https://stats.stackexchange.com/questions/219013/how-do-the-number-of-imputations-the-maximum-iterations-affect-accuracy-in-mul
 
---> Informative stackoverflow about imputation methods in mice. 
-Although with multiple imputed data sets we would reach better accuracy, it is only advisable to use multiple imputed data sets assuming we have a linear relationship.
+We use the mean method in the mice package for a first imputation. Mean imputation is a very simple and straight forward approach to imputing. The upside is the clear way of imputation, we are not going to create outliers and the mean of the variables does not get changed. On the other hand, the imputed values might be very different to the values that are the actual (unobserved) values. Also, even tho the mean stays the same, the variation is going to get lower, which is not what we might want to get a robust model. 
+We use this as our baseline data set.
+
+As a second reference model we use the cart method from mice, which uses classification and regression trees to impute the missing variablers. As we only have missing values that are continuous, regression trees are used to compute the imputed variables. This is going to give us very different values to the mean, creating a more variable data set.
+
+We create one imputed data set each (m = 1), as multiple imputed data sets can only be used as a joint for model selection/prediciton when we can assume a linear relationship.
+
+Furthermore we use maxit = 20 to make sure the predictors for the regression trees converge.
 
 
 ```{r}
@@ -284,24 +299,14 @@ cl <- makeCluster(K)
 
 registerDoParallel(cl)
 
-# using "pmm" method from MICE package, as it needs quite a lot computation we set m=1 and maxit=1
-  train_imputed_pmm <- complete(mice(train_without_dummyNA, m=1, maxit = 20, meth = "pmm", seed = 50))
-write.csv(train_imputed_pmm, file = "./train_imputed_pmm.csv", row.names = FALSE)
- 
-# using "norm.predict" method from MICE package
-  train_imputed_norm <- complete(mice(train_without_dummyNA, m=1, maxit = 20, meth = "norm.predict", seed = 50))
-write.csv(train_imputed_norm, file = "./train_imputed_norm.csv", row.names = FALSE)
-apply(train_imputed_norm,2, pMiss) 
 
-# using "rf" method from MICE package
-  train_imputed_rf <- complete(mice(train_without_dummyNA, m=1, maxit = 20, meth = "rf", seed = 50))
-write.csv(train_imputed_rf, file = "./train_imputed_rf.csv", row.names = FALSE)
-apply(train_imputed_rf,2, pMiss)
+# using "mean" method from MICE package
+  train_imputed_mean <- complete(mice(train_without_dummyNA, m=1, maxit = 20, meth = "mean", seed = 50))
+write.csv(train_imputed_mean, file = "./train_imputed_mean.csv", row.names = FALSE)
 
-# using "rf" method from MICE package
+# using "cart" method from MICE package
   train_imputed_cart <- complete(mice(train_without_dummyNA, m=1, maxit = 20, meth = "cart", seed = 50))
 write.csv(train_imputed_cart, file = "./train_imputed_cart.csv", row.names = FALSE)
-apply(train_imputed_rf,2, pMiss)
 
 # Once you finished, you deactivate the cluster
 # with these two commands.
@@ -309,63 +314,87 @@ stopCluster(cl)
 registerDoSEQ()
 
 ```
-## Load the imputed dataset
+
+
+## Compare the imputed datasets
+
+
+First we compare our baseline and our reference data with the original train data (with the missing values). We use densitiy plots to find out if the distribution of variables we imputed has changed.
 
 ```{r}
-train_imputed_pmm <- read.csv("./train_imputed_pmm.csv")
-train_imputed_norm <- read.csv("./train_imputed_norm.csv")
-train_imputed_rf <- read.csv("./train_imputed_rf.csv")
+train_imputed_mean <- read.csv("./train_imputed_mean.csv")
 train_imputed_cart <- read.csv("./train_imputed_cart.csv")
 
 # Look at the distribution of imputed numeric data, the plot is ugly haha -noo way i Love these plots ++!
 # area
 plot(density(train_without_dummyNA$area, na.rm = TRUE))
-lines(density(train_imputed_pmm$area), col = "red")
-lines(density(train_imputed_norm$area), col = "green")
-lines(density(train_imputed_rf$area), col = "blue")
-lines(density(train_imputed_cart$area), col = "yellow")
+lines(density(train_imputed_mean$area), col = "red")
+lines(density(train_imputed_cart$area), col = "green")
 
 # floors
 plot(density(train_without_dummyNA$floors, na.rm = TRUE))
-lines(density(train_imputed_pmm$floors), col = "red")
-lines(density(train_imputed_norm$floors), col = "green")
-lines(density(train_imputed_rf$floors), col = "blue")
-lines(density(train_imputed_cart$floors), col = "yellow")
+lines(density(train_imputed_mean$floors), col = "red")
+lines(density(train_imputed_cart$floors), col = "green")
 
 # rooms
 plot(density(train_without_dummyNA$rooms, na.rm = TRUE))
-lines(density(train_imputed_pmm$rooms), col = "red")
-lines(density(train_imputed_norm$rooms), col = "green")
-lines(density(train_imputed_rf$rooms), col = "blue")
-lines(density(train_imputed_cart$rooms), col = "yellow")
+lines(density(train_imputed_mean$rooms), col = "red")
+lines(density(train_imputed_cart$rooms), col = "green")
 
 # year_built
 plot(density(train_without_dummyNA$year_built, na.rm = TRUE))
-lines(density(train_imputed_pmm$year_built), col = "red")
-lines(density(train_imputed_norm$year_built), col = "green")
-lines(density(train_imputed_rf$year_built), col = "blue")
-lines(density(train_imputed_cart$year_built), col = "yellow")
+lines(density(train_imputed_mean$year_built), col = "red")
+lines(density(train_imputed_cart$year_built), col = "green")
 
-train_forcorr <- cor(train_imputed_pmm %>% keep(is.numeric) %>% dplyr::select(-starts_with("zipcode")))
-corrplot(train_forcorr, method = "circle")
-
-train_forcorr <- cor(train_imputed_norm %>% keep(is.numeric) %>% dplyr::select(-starts_with("zipcode")))
-corrplot(train_forcorr, method = "circle")
-
-train_forcorr <- cor(train_imputed_rf %>% keep(is.numeric) %>% dplyr::select(-starts_with("zipcode")))
-corrplot(train_forcorr, method = "circle")
-
-train_forcorr <- cor(train_imputed_cart %>% keep(is.numeric) %>% dplyr::select(-starts_with("zipcode")))
-corrplot(train_forcorr, method = "circle")
 ```
 
-## Look at correalation
+The density functions show that the data is differently distributed between the data sets. The mean imputation leads to spikes at the mean value, and the cart imputatation leads to more evenly distributed data.
+?????? weird with floors 
+
+We also compare the correlation matrices of the three data sets.
 
 ```{r}
 
+train_forcorr <- cor(train_without_dummyNA %>% keep(is.numeric) %>% dplyr::select(-starts_with("zipcode")))
+corrplot(train_forcorr, method = "circle", title = "Correlation Plot for train data with dummy NA's changed to 0, no imputation")
+
+
+train_forcorr <- cor(train_imputed_mean %>% keep(is.numeric) %>% dplyr::select(-starts_with("zipcode")))
+corrplot(train_forcorr, method = "circle", title = "Correlation Plot for mean imputation")
+
+train_forcorr <- cor(train_imputed_cart %>% keep(is.numeric) %>% dplyr::select(-starts_with("zipcode")))
+corrplot(train_forcorr, method = "circle", title = "Correlation Plot for cart imputation")
+
+```
+
+The correlation matrices look very similar and only differ very slightly between the two imputed data sets and the data without imputation.
+
+
+## Model selection
+
+
+# Preperational insights
+
+
+We now wanna have a first look at which variables might influence our outcome variable and in which way. We take a look at graphs showing the bivariate relationship between different independent variables and our outcome variable, price.
+
+```{r}
+
+plot(train_imputed_mean$area, train_imputed_mean$price) # maybe delete area >600 , relationship seems pretty linear 
+
+plot(train_imputed_mean$floors, train_imputed_mean$price) # hard to tell, but looks non linear
+
+plot(train_imputed_mean$rooms, train_imputed_mean$price) # hard to tell too
+
+plot(train_imputed_mean$year, train_imputed_mean$price) # no relationship detectable
+
+plot(train_imputed_mean$year_built, train_imputed_mean$price) # quadratic/exponential ??
+
+
+
 plot(train_imputed_cart$area, train_imputed_cart$price) # maybe delete area >600 # relationship seems pretty linear 
 
-plot(train_imputed_cart$floors, train_imputed_cart$price) # hard to tell
+plot(train_imputed_cart$floors, train_imputed_cart$price) # hard to tellbut looks non linear
 
 plot(train_imputed_cart$rooms, train_imputed_cart$price) # hard to tell too
 
@@ -374,23 +403,34 @@ plot(train_imputed_cart$year, train_imputed_cart$price) # no relationship detect
 plot(train_imputed_cart$year_built, train_imputed_cart$price) # quadratic/exponential ??
 ```
 
-Really hard to detect any relationship, for example to use polynomials in linear regression.
 
+# Splitting our training data into training and validation partitions
 
-## Linear regression with k fold cross validation.
-
-We include some interaction variables 
 
 ```{r}
 
 # Split the data into training and test set
 
 set.seed(123)
-training.samples <- train_imputed_cart$price %>%
+training.samples <- train_imputed_mean$price %>%
   createDataPartition(p = 0.8, list = FALSE)
-train.data  <- train_imputed_cart[training.samples, ]
-test.data <- train_imputed_cart[-training.samples, ]
+train.data  <- train_imputed_mean[training.samples, ]
+test.data <- train_imputed_mean[-training.samples, ]
 
+training.samples_reference <- train_imputed_cart$price %>%
+  createDataPartition(p = 0.8, list = FALSE)
+train.data_reference  <- train_imputed_cart[training.samples_reference, ]
+test.data_reference <- train_imputed_cart[-training.samples_reference, ]
+
+```
+
+
+# Linear Model
+
+
+We build a first basic linear model.
+
+```{r}
 # Build the model
 lm_fit <- lm(price ~., data = train.data)
 
@@ -408,17 +448,20 @@ head(train.data[influential, ])  # influential observations.
 train.data_without_outliers <- train.data[-influential,] # Don't know why, when I ran this code, it rerurned me an error: Error in xj[i] : only 0's may be mixed with negative subscripts, which spent me the whole morning to deal with...but failed eventually...and I tried this again at noon, it is successfully running
 
 
-# new model 
+# new model wihtout outliers
 
 lm_fit_without_outliers <- lm(price ~., data = train.data_without_outliers)
 
 # Make predictions and compute the R2, RMSE and MAE
-# When running the "predict code", can we ignore this warning message?
-# https://stackoverflow.com/questions/26558631/predict-lm-in-a-loop-warning-prediction-from-a-rank-deficient-fit-may-be-mis
-# Warning message: In predict.lm(., test.data) :prediction from a rank-deficient fit may be misleading
 
 predictions <- lm_fit %>% predict(test.data)
 predictions_without_outliers <- lm_fit_without_outliers %>% predict(test.data)
+
+# store MSE
+
+lm_fit_mse <- (RMSE(predictions_without_outliers, test.data$price)^2)
+lm_fit_without_outliers_mse <- (RMSE(predictions, test.data$price)^2)
+
 data.frame( R2 = R2(predictions, test.data$price),
             RMSE = RMSE(predictions, test.data$price),
             MAE = MAE(predictions, test.data$price))
@@ -430,6 +473,13 @@ data.frame( R2 = R2(predictions_without_outliers, test.data$price),
 # Check the residual vs fitted plot, patches of many positive residuals in the middle, but patches of negative residuals at the right-hand side, suggesting linear model maybe not appropriate.
 plot(lm_fit)
 
+```
+
+Outliers do affect our model only arbitrarily. 
+
+The plot of residual vs. plotted shows that there is heteroskedasticity present - our linear model assumptions are hurt. We will add some interaction terms first. 
+
+```{r}
 # Include interaction terms (area:rooms; floors:elvator; area:floors; area:zipcode)
 lm_fit1 <- lm(price ~ . + area:rooms + floors:elevator + area:floors 
                + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
@@ -448,18 +498,28 @@ lm_fit1 <- lm(price ~ . + area:rooms + floors:elevator + area:floors
                + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
                + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
                + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
-               + area:zipcode_95 + area:zipcode_96, data = train.data) # If there is a quick way to include these interaction terms?
+               + area:zipcode_95 + area:zipcode_96, data = train.data) 
 
-summary(lm_fit1)
+
 predictions_lm_fit1 <- lm_fit1 %>% predict(test.data)
 data.frame( R2 = R2(predictions_lm_fit1, test.data$price),
             RMSE = RMSE(predictions_lm_fit1, test.data$price),
             MAE = MAE(predictions_lm_fit1, test.data$price))
-# including the interaction terms lowers RMSE to 702.834.
+
+# store mse
+
+lm_fit1_mse <- (RMSE(predictions_lm_fit1, test.data$price)^2)
+
+# including the interaction terms lowers RMSE to 411990.7.
 
 plot(lm_fit1)
 # there is some serious leverage from a couple data points 
+```
 
+The residual vs. fitted look better already - but still far from good ! We will now try out some polynomial terms in our regression.
+
+
+```{r}
 # have a try on polynomial regression
 # First, check which degree of polynomial to choose
 set.seed(1)
@@ -484,7 +544,7 @@ for (i in 1:5) {
               + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
               + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
               + area:zipcode_95 + area:zipcode_96, data = train.data)
-  cv.error.5[i] <- cv.glm(train.data, fit_area, K = 5)$delta[1]
+  cv.error.area[i] <- cv.glm(train.data, fit_area, K = 5)$delta[1]
 }
 plot(cv.error.area, xlab = "Degrees of polynomial for area", ylab = "Cross-validation error", type = "b", col = "blue") # we set degrees of polynomial for area as 4
 
@@ -509,11 +569,11 @@ for (i in 1:5) {
               + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
               + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
               + area:zipcode_95 + area:zipcode_96, data = train.data)
-  cv.error.5[i] <- cv.glm(train.data, fit_floors, K = 5)$delta[1]
+  cv.error.floors[i] <- cv.glm(train.data, fit_floors, K = 5)$delta[1]
 }
 plot(cv.error.floors, xlab = "Degrees of polynomial for floors", ylab = "Cross-validation error", type = "b", col = "blue") # we set degrees of polynomial for floors as 3
 
-# for floors
+# for rooms
 cv.error.rooms <- rep(0,5)
 for (i in 1:5) {
   fit_rooms <- glm(price ~ . + area:rooms + floors:elevator + area:floors - rooms  + poly(rooms,df = i)
@@ -536,9 +596,9 @@ for (i in 1:5) {
               + area:zipcode_95 + area:zipcode_96, data = train.data)
   cv.error.rooms[i] <- cv.glm(train.data, fit_rooms, K = 5)$delta[1]
 }
-plot(cv.error.rooms, xlab = "Degrees of polynomial for rooms", ylab = "Cross-validation error", type = "b", col = "blue") # we set degrees of polynomial for rooms as 5
+plot(cv.error.rooms, xlab = "Degrees of polynomial for rooms", ylab = "Cross-validation error", type = "b", col = "blue") # we set degrees of polynomial for rooms as 3
 
-lm_fit2 <- lm (price ~ . -area - floors - rooms + area:rooms + floors:elevator + area:floors + poly(area, 4) + poly(floors, 3) +poly(rooms, 5)
+lm_fit2 <- lm (price ~ . -area - floors - rooms + area:rooms + floors:elevator + area:floors + poly(area, 4) + poly(floors, 3) +poly(rooms, 3)
               + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
               + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
               + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
@@ -557,12 +617,23 @@ lm_fit2 <- lm (price ~ . -area - floors - rooms + area:rooms + floors:elevator +
               + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
               + area:zipcode_95 + area:zipcode_96, data = train.data) 
 
-summary(lm_fit2)
 predictions_lm_fit2 <- lm_fit2 %>% predict(test.data)
+
 data.frame( R2 = R2(predictions_lm_fit2, test.data$price),
             RMSE = RMSE(predictions_lm_fit2, test.data$price),
             MAE = MAE(predictions_lm_fit2, test.data$price))
 
+# store mse
+
+lm_fit2_mse <- (RMSE(predictions_lm_fit2, test.data$price)^2)
+
+```
+
+
+This new fit including interaction terms and polynomials contains a lot of predictors, which might introduce some serious overfitting in the model. It likely contains many predictors that do not explain the data well. Because of this, we will perform automated stepwise model selection.
+
+
+```{r, include = False}
 # model selection
 # backward selection: RMSE = 379297.9	
 lm_backward <-  stepAIC(lm_fit2, direction = "backward")
@@ -583,30 +654,9 @@ data.frame( R2 = R2(predictions_lm_forward, test.data$price),
 
 ```
 
-Our validation set error is pretty high, and deleting outlier observations does not considerably change this. We should try out different approaches.
 
-## Moing to nonlinearity: Smooth Spline and GAM
+# Ridge, LASSO and Elastic-net regression
 
-```{r}
-# Smoothing spline for rooms
-room.fit <- smooth.spline(train.data$rooms, train.data$price, cv=TRUE)
-room.fit$df
-
-floors.fit <- smooth.spline(train.data$floors, train.data$price, cv=TRUE)
-floors.fit$df
-
-area.fit <- smooth.spline(train.data$area, train.data$price, cv=TRUE)
-area.fit$df
-
-# gam without interaction terms
-gam.m0 <- gam(price ~ . - area + s(area, area.fit$df) - floors + s(floors, floors.fit$df) - rooms + s(rooms, room.fit$df), data = train.data)
-gam.m0_pred <- gam.m0 %>% predict(test.data)
-data.frame( R2 = R2(gam.m0_pred, test.data$price),
-            RMSE = RMSE(gam.m0_pred, test.data$price),
-            MAE = MAE(gam.m0_pred, test.data$price))
-```
-
-## Moving to Ridge, LASSO and Elastic-net regression
 Our data has quite some variables. Especially as we redifined NA's to 0 in the case of dummy variables and imputed the other ones, this can introduce bias. Also, we do not want our model to get into the trap of what is known as "the curse of dimensionality". One way to work against this is to build a LASSO Model - which is designed to force coefficients to get exactly zero. This way, we might be able to drop some variables which do not have good explanational power.
 
 ```{r}
@@ -650,62 +700,67 @@ lasso_fit <- cv.glmnet(train_x, train_y, type.measure="mse",
 
 lasso_predicted <- predict(lasso_fit, s=lasso_fit$lambda.min, newx = test_x)
 
-sqrt(mean((test_y - lasso_predicted)^2))
-
-
-# fit model 
-
-lasso_fit <- glmnet(lasso_x, lasso_y, alpha = 1)
-set.seed(1)
-cv.out <- cv.glmnet(lasso_x, lasso_y, alpha = 1)
-bestlam <- cv.out$lambda.min
-lasso_pred <- predict(lasso_fit, s = bestlam, newx = test_x)
-mean((lasso_pred - test_y)^2)
-
-out <- glmnet(lasso_x, lasso_y, alpha = 1)
-lasso.coef <- predict(out, type = "coefficients", s= bestlam)[1:20,]
- 
-lasso.coef[lasso.coef != 0]
-
-## lasso with interaction terms
-#lasso_y <- as.numeric(lasso_y)
-#lasso_interact <- hierNet(lasso_x, lasso_y, lam = bestlam)
-#lasso_interact_testyhat <- predict(lasso_interact, newx = test_x)
-#mean((test_x - lasso_interact_testyhat)^2)
-
-# no good...
+lasso_mse <- mean((test_y - lasso_predicted)^2)
 
 ```
+
+
+# Moving to nonlinearity: Smooth Spline and GAM
+
+
+```{r}
+# Smoothing spline for rooms
+room.fit <- smooth.spline(train.data$rooms, train.data$price, cv=TRUE)
+room.fit$df
+
+floors.fit <- smooth.spline(train.data$floors, train.data$price, cv=TRUE)
+floors.fit$df
+
+area.fit <- smooth.spline(train.data$area, train.data$price, cv=TRUE)
+area.fit$df
+
+# gam without interaction terms
+gam.m0 <- gam(price ~ . - area + s(area, area.fit$df) - floors + s(floors, floors.fit$df) - rooms + s(rooms, room.fit$df), data = train.data)
+gam.m0_pred <- gam.m0 %>% predict(test.data)
+data.frame( R2 = R2(gam.m0_pred, test.data$price),
+            RMSE = RMSE(gam.m0_pred, test.data$price),
+            MAE = MAE(gam.m0_pred, test.data$price))
+
+# store mse
+
+gam_m0_mse <- ((RMSE(gam.m0_pred, test.data$price))^2)
+
+```
+
+
 Our lasso model has the advantage that there is only 15 predictors left which are used for computing the estimates. Also , our LASSO Model has the best RMSE so far. 
 
-## Walking into the forest for some qualitree times
+# Walking into the forest for some qualitree times
 
 ```{r}
 # Fitting regression tree
+
 set.seed(1)
 
 tree_fit <- tree(price ~. , data = train.data)
 cv_tree <- cv.tree(tree_fit)
 tree_testyhat <- predict(tree_fit, newdata = test.data)
-mean((test.data$price - tree_testyhat)^2)
+tree_mse <- mean((test.data$price - tree_testyhat)^2)
 
-# Random forest
-# code from: https://github.com/StatQuest/random_forest_demo/blob/master/random_forest_demo.R
-
-set.seed(1)
-rf_fit <- randomForest(price ~ . , data = train.data, mtry = 3, ntree = 25, proximity = TRUE) #Here use default mrty and ntree, but it seems I don't have enough memory for rf, always returns error: cannot allocate vector of size 5.8 Gb
-
-# find optimal value of mtry or ntree, here i input ntree = 25
-oob.values <- vector(length = 10)
-for (i in 1:10){
-  temp.model <- randomForest(price ~ ., data = train.data, mtry = i, ntree = 25)
-  oob.values[i] <- temp.model$err.rate[nrow(temp.model$err.rate), 1]
-}
-
-rf_testyhat <- predict(rf_fit, newdata = test.data)
-sqrt(mean((test.data$price - rf_testyhat)^2))
+rf <- ranger(price ~., data = train.data, write.forest = TRUE)
+rf_testyhat <- predict(rf, test.data)$predictions
+rf_mse <- mean((test.data$price - rf_testyhat)^2)
 ```
 
+# Compare Models
+
+```{r}
+mse_vector <- c(lm_fit_mse, lm_fit_without_outliers_mse, lm_fit1_mse, lm_fit2_mse, lasso_mse, gam_m0_mse,tree_mse, rf_mse)
+mse_table <- data.frame(mse_vector, row.names = c("Linear fit", "Linear fit without outliers", "Linear fit with interactions", "Linear fit with interactions and polynomials", "Lasso", "GAM", "Tree", "Random Forest"))
+mse_table[,2] <- mse_table[1]/min(mse_vector)
+colnames(mse_table) <- c("MSE", "difference to best model")
+mse_table
+```
 
 ## Imputation of the test dataset .
 
