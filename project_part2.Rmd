@@ -353,9 +353,6 @@ plot(density(train_imputed_cart$year_built), main = "year_built(cart)", col = "g
 ```
 
 The density functions show that the data is differently distributed between the data sets. The mean imputation leads to spikes at the mean value, and the cart imputatation leads to more evenly distributed data.
-?????? weird with floors(Yes...using mean should not have so many spikes, but I think the new plots make sense right now? I made another density plot for each of numeric variable, and we can see that from these density plots, the cart imputation is more similar to the original dataset.)
-
-
 
 We also compare the correlation matrices of the three data sets.
 
@@ -519,7 +516,7 @@ lm_fit1_mse <- (RMSE(predictions_lm_fit1, test.data$price)^2)
 # including the interaction terms lowers RMSE to 411990.7.
 
 plot(lm_fit1)
-# there is some serious leverage from a couple data points 
+# there is some pretty big leverage from a couple data points 
 ```
 
 The residual vs. fitted look better already - but still far from good ! We will now try out some polynomial terms in our regression.
@@ -758,12 +755,13 @@ test_x_1 <- model.matrix(price ~ .  + area:rooms + floors:elevator + area:floors
 lasso_fit_1 <- cv.glmnet(train_x_1, train_y, type.measure="mse", 
   alpha=1, family="gaussian")
 lasso_predicted_1 <- predict(lasso_fit_1, s=lasso_fit_1$lambda.min, newx = test_x_1)
-lasso_intreaction_mse <- mean((test_y - lasso_predicted_1)^2))
+lasso_intreaction_mse <- mean((test_y - lasso_predicted_1)^2)
 ```
 
 
 
 # Moving to nonlinearity: Smooth Spline and GAM
+
 The plot of residual vs. plotted indicates that the linearity assumption might not hold for our dataset. Though we have tried out polynomial regressions before, we want to use more sophisticated approaches, like splines and generalized additive models. The reason is that smoothing splines are more flexible than polynomial and generalized additive midels allow us to apply the nonlinearity methods to multiple variables.
 
 
@@ -886,8 +884,6 @@ lasso_gam_mse <- mean((test_y - lasso_predicted_2)^2)
 ```
 
 
-Our lasso model has the advantage that there is only 15 predictors left which are used for computing the estimates. Also , our LASSO Model has the best RMSE so far. 
-
 ## Walking into the forest for some qualitree times
 We can see that the regression tree is not competitive with other supervised learning approaches that shown before. The plot tree with node labels suggests that the regression tree only considers two variables, area and zipcode, and has only 7 terminal nodes. Consequently, its prediction accuracy is pretty low. In order to producee a more powerful prediction model, we also use random forest approach.
 ```{r}
@@ -903,8 +899,6 @@ text(tree_fit, pretty = 0)
 
 
 # random forest: RMSE = 396742.6, much better:)))
-=======
-# Random forest
 
 rf <- ranger(price ~., data = train.data, write.forest = TRUE)
 rf_testyhat <- predict(rf, test.data)$predictions
@@ -912,7 +906,7 @@ rf_mse <- mean((test.data$price - rf_testyhat)^2)
 ```
 
 
-# Compare Models
+# Compare and choose best model
 
 ```{r}
 mse_vector <- c(lm_fit_mse, lm_fit_without_outliers_mse, lm_fit1_mse, lm_fit2_mse, lasso_mse, gam_m0_mse,tree_mse, rf_mse)
@@ -922,18 +916,171 @@ colnames(mse_table) <- c("MSE", "difference to best model")
 mse_table
 ```
 
-## Imputation of the test dataset .
+## Fit our top model onto the entire training data.
+
+So far we used only 80% of the training data to fit our model - because we used the remaining 20% for validation of the model. This does make a lot of sense for evaluating the different models, but for building our final model that we predict on the test data, we should use all our training data to get the best results. So we now fit our best scoring model on the entire training data.
+
+Our best model is the fit of a linear model including interaction terms and polynomials (denoted by lm_fit2), which then get's trimmed down by backward selection using AIC stepwise selection. So we perform these components on our complete training data, using the cart method
+
+```{r}
+
+lm_fit2_entire_train <- lm (price ~ . -area - floors - rooms + area:rooms + floors:elevator + area:floors + poly(area, 4) + poly(floors, 3) +poly(rooms, 3)
+              + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
+              + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
+              + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
+              + area:zipcode_26 + area:zipcode_27 + area:zipcode_28 + area:zipcode_29 + area:zipcode_30 
+              + area:zipcode_31 + area:zipcode_32 + area:zipcode_33 + area:zipcode_34 + area:zipcode_35 
+              + area:zipcode_36 + area:zipcode_37 + area:zipcode_38 + area:zipcode_39 + area:zipcode_40  
+              + area:zipcode_41 + area:zipcode_42 + area:zipcode_43 + area:zipcode_44 + area:zipcode_45 
+              + area:zipcode_46 + area:zipcode_47 + area:zipcode_48 + area:zipcode_49 + area:zipcode_50 
+              + area:zipcode_51 + area:zipcode_52 + area:zipcode_53 + area:zipcode_54 + area:zipcode_55 
+              + area:zipcode_56 + area:zipcode_57 + area:zipcode_60 + area:zipcode_61 + area:zipcode_62 
+              + area:zipcode_63 + area:zipcode_64 + area:zipcode_65 + area:zipcode_66 + area:zipcode_67 
+              + area:zipcode_68 + area:zipcode_69 + area:zipcode_70 + area:zipcode_71 + area:zipcode_72 
+              + area:zipcode_73 + area:zipcode_74 + area:zipcode_75 + area:zipcode_76 + area:zipcode_77
+              + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
+              + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
+              + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
+              + area:zipcode_95 + area:zipcode_96, data = train_imputed_cart)
+
+final_model <- stepAIC(lm_fit2_entire_train, direction = "backward")
+
+# get MSE of final model
+
+final_train_predictions <- final_model %>% predict(train_imputed_cart)
+
+data.frame( R2 = R2(final_train_predictions, train_imputed_cart$price),
+            RMSE = RMSE(final_train_predictions, train_imputed_cart$price),
+            MAE = MAE(final_train_predictions, train_imputed_cart$price))
+```
+
+# Predicting our final model on the test data
+## Making test data ready for imputation
+
+To be able to predict the outcome values for our test data, we have to transform our test data in exactly the same way we did on our training data. 
 
 ```{r}
 # substitute NA's in dummy vars with 0
 X_test_without_dummyNA <- X_test %>% mutate_at(.vars = dummy_cols, .funs = funs(ifelse(is.na(.), 0, .)))
 
+# zipcode as numeric
+
+X_test_without_dummyNA$zipcode <- as.numeric(X_test_without_dummyNA$zipcode)
+
+# do not use zip code but first two digits of zip code -- otherwise too many clusters having too few observations
+
+X_test_without_dummyNA$zipcode_11 <- ifelse(X_test_without_dummyNA$zipcode >= 1100 & X_test_without_dummyNA$zipcode <= 1199, 1, 0)
+X_test_without_dummyNA$zipcode_12 <- ifelse(X_test_without_dummyNA$zipcode >= 1200 & X_test_without_dummyNA$zipcode <= 1299, 1, 0)
+X_test_without_dummyNA$zipcode_13 <- ifelse(X_test_without_dummyNA$zipcode >= 1300 & X_test_without_dummyNA$zipcode <= 1399, 1, 0)
+X_test_without_dummyNA$zipcode_14 <- ifelse(X_test_without_dummyNA$zipcode >= 1400 & X_test_without_dummyNA$zipcode <= 1499, 1, 0)
+X_test_without_dummyNA$zipcode_15 <- ifelse(X_test_without_dummyNA$zipcode >= 1500 & X_test_without_dummyNA$zipcode <= 1599, 1, 0)
+X_test_without_dummyNA$zipcode_16 <- ifelse(X_test_without_dummyNA$zipcode >= 1600 & X_test_without_dummyNA$zipcode <= 1699, 1, 0)
+X_test_without_dummyNA$zipcode_17 <- ifelse(X_test_without_dummyNA$zipcode >= 1700 & X_test_without_dummyNA$zipcode <= 1799, 1, 0)
+X_test_without_dummyNA$zipcode_18 <- ifelse(X_test_without_dummyNA$zipcode >= 1800 & X_test_without_dummyNA$zipcode <= 1899, 1, 0)
+X_test_without_dummyNA$zipcode_19 <- ifelse(X_test_without_dummyNA$zipcode >= 1900 & X_test_without_dummyNA$zipcode <= 1999, 1, 0)
+X_test_without_dummyNA$zipcode_20 <- ifelse(X_test_without_dummyNA$zipcode >= 2000 & X_test_without_dummyNA$zipcode <= 2099, 1, 0)
+X_test_without_dummyNA$zipcode_21 <- ifelse(X_test_without_dummyNA$zipcode >= 2100 & X_test_without_dummyNA$zipcode <= 2199, 1, 0)
+X_test_without_dummyNA$zipcode_22 <- ifelse(X_test_without_dummyNA$zipcode >= 2200 & X_test_without_dummyNA$zipcode <= 2299, 1, 0)
+X_test_without_dummyNA$zipcode_23 <- ifelse(X_test_without_dummyNA$zipcode >= 2300 & X_test_without_dummyNA$zipcode <= 2399, 1, 0)
+X_test_without_dummyNA$zipcode_24 <- ifelse(X_test_without_dummyNA$zipcode >= 2400 & X_test_without_dummyNA$zipcode <= 2499, 1, 0)
+X_test_without_dummyNA$zipcode_25 <- ifelse(X_test_without_dummyNA$zipcode >= 2500 & X_test_without_dummyNA$zipcode <= 2599, 1, 0)
+X_test_without_dummyNA$zipcode_26 <- ifelse(X_test_without_dummyNA$zipcode >= 2600 & X_test_without_dummyNA$zipcode <= 2699, 1, 0)
+X_test_without_dummyNA$zipcode_27 <- ifelse(X_test_without_dummyNA$zipcode >= 2700 & X_test_without_dummyNA$zipcode <= 2799, 1, 0)
+X_test_without_dummyNA$zipcode_28 <- ifelse(X_test_without_dummyNA$zipcode >= 2800 & X_test_without_dummyNA$zipcode <= 2899, 1, 0)
+X_test_without_dummyNA$zipcode_29 <- ifelse(X_test_without_dummyNA$zipcode >= 2900 & X_test_without_dummyNA$zipcode <= 2999, 1, 0)
+X_test_without_dummyNA$zipcode_30 <- ifelse(X_test_without_dummyNA$zipcode >= 3000 & X_test_without_dummyNA$zipcode <= 3099, 1, 0)
+X_test_without_dummyNA$zipcode_31 <- ifelse(X_test_without_dummyNA$zipcode >= 3100 & X_test_without_dummyNA$zipcode <= 3199, 1, 0)
+X_test_without_dummyNA$zipcode_32 <- ifelse(X_test_without_dummyNA$zipcode >= 3200 & X_test_without_dummyNA$zipcode <= 3299, 1, 0)
+X_test_without_dummyNA$zipcode_33 <- ifelse(X_test_without_dummyNA$zipcode >= 3300 & X_test_without_dummyNA$zipcode <= 3399, 1, 0)
+X_test_without_dummyNA$zipcode_34 <- ifelse(X_test_without_dummyNA$zipcode >= 3400 & X_test_without_dummyNA$zipcode <= 3499, 1, 0)
+X_test_without_dummyNA$zipcode_35 <- ifelse(X_test_without_dummyNA$zipcode >= 3500 & X_test_without_dummyNA$zipcode <= 3599, 1, 0)
+X_test_without_dummyNA$zipcode_36 <- ifelse(X_test_without_dummyNA$zipcode >= 3600 & X_test_without_dummyNA$zipcode <= 3699, 1, 0)
+X_test_without_dummyNA$zipcode_37 <- ifelse(X_test_without_dummyNA$zipcode >= 3700 & X_test_without_dummyNA$zipcode <= 3799, 1, 0)
+X_test_without_dummyNA$zipcode_38 <- ifelse(X_test_without_dummyNA$zipcode >= 3800 & X_test_without_dummyNA$zipcode <= 3899, 1, 0)
+X_test_without_dummyNA$zipcode_39 <- ifelse(X_test_without_dummyNA$zipcode >= 3900 & X_test_without_dummyNA$zipcode <= 3999, 1, 0)
+X_test_without_dummyNA$zipcode_40 <- ifelse(X_test_without_dummyNA$zipcode >= 4000 & X_test_without_dummyNA$zipcode <= 4099, 1, 0)
+X_test_without_dummyNA$zipcode_41 <- ifelse(X_test_without_dummyNA$zipcode >= 4100 & X_test_without_dummyNA$zipcode <= 4199, 1, 0)
+X_test_without_dummyNA$zipcode_42 <- ifelse(X_test_without_dummyNA$zipcode >= 4200 & X_test_without_dummyNA$zipcode <= 4299, 1, 0)
+X_test_without_dummyNA$zipcode_43 <- ifelse(X_test_without_dummyNA$zipcode >= 4300 & X_test_without_dummyNA$zipcode <= 4399, 1, 0)
+X_test_without_dummyNA$zipcode_44 <- ifelse(X_test_without_dummyNA$zipcode >= 4400 & X_test_without_dummyNA$zipcode <= 4499, 1, 0)
+X_test_without_dummyNA$zipcode_45 <- ifelse(X_test_without_dummyNA$zipcode >= 4500 & X_test_without_dummyNA$zipcode <= 4599, 1, 0)
+X_test_without_dummyNA$zipcode_46 <- ifelse(X_test_without_dummyNA$zipcode >= 4600 & X_test_without_dummyNA$zipcode <= 4699, 1, 0)
+X_test_without_dummyNA$zipcode_47 <- ifelse(X_test_without_dummyNA$zipcode >= 4700 & X_test_without_dummyNA$zipcode <= 4799, 1, 0)
+X_test_without_dummyNA$zipcode_48 <- ifelse(X_test_without_dummyNA$zipcode >= 4800 & X_test_without_dummyNA$zipcode <= 4899, 1, 0)
+X_test_without_dummyNA$zipcode_49 <- ifelse(X_test_without_dummyNA$zipcode >= 4900 & X_test_without_dummyNA$zipcode <= 4999, 1, 0)
+X_test_without_dummyNA$zipcode_50 <- ifelse(X_test_without_dummyNA$zipcode >= 5000 & X_test_without_dummyNA$zipcode <= 5099, 1, 0)
+X_test_without_dummyNA$zipcode_51 <- ifelse(X_test_without_dummyNA$zipcode >= 5100 & X_test_without_dummyNA$zipcode <= 5199, 1, 0)
+X_test_without_dummyNA$zipcode_52 <- ifelse(X_test_without_dummyNA$zipcode >= 5200 & X_test_without_dummyNA$zipcode <= 5299, 1, 0)
+X_test_without_dummyNA$zipcode_53 <- ifelse(X_test_without_dummyNA$zipcode >= 5300 & X_test_without_dummyNA$zipcode <= 5399, 1, 0)
+X_test_without_dummyNA$zipcode_54 <- ifelse(X_test_without_dummyNA$zipcode >= 5400 & X_test_without_dummyNA$zipcode <= 5499, 1, 0)
+X_test_without_dummyNA$zipcode_55 <- ifelse(X_test_without_dummyNA$zipcode >= 5500 & X_test_without_dummyNA$zipcode <= 5599, 1, 0)
+X_test_without_dummyNA$zipcode_56 <- ifelse(X_test_without_dummyNA$zipcode >= 5600 & X_test_without_dummyNA$zipcode <= 5699, 1, 0)
+X_test_without_dummyNA$zipcode_57 <- ifelse(X_test_without_dummyNA$zipcode >= 5700 & X_test_without_dummyNA$zipcode <= 5799, 1, 0)
+X_test_without_dummyNA$zipcode_58 <- ifelse(X_test_without_dummyNA$zipcode >= 5800 & X_test_without_dummyNA$zipcode <= 5899, 1, 0)
+X_test_without_dummyNA$zipcode_59 <- ifelse(X_test_without_dummyNA$zipcode >= 5900 & X_test_without_dummyNA$zipcode <= 5999, 1, 0)
+X_test_without_dummyNA$zipcode_60 <- ifelse(X_test_without_dummyNA$zipcode >= 6000 & X_test_without_dummyNA$zipcode <= 6099, 1, 0)
+X_test_without_dummyNA$zipcode_61 <- ifelse(X_test_without_dummyNA$zipcode >= 6100 & X_test_without_dummyNA$zipcode <= 6199, 1, 0)
+X_test_without_dummyNA$zipcode_62 <- ifelse(X_test_without_dummyNA$zipcode >= 6200 & X_test_without_dummyNA$zipcode <= 6299, 1, 0)
+X_test_without_dummyNA$zipcode_63 <- ifelse(X_test_without_dummyNA$zipcode >= 6300 & X_test_without_dummyNA$zipcode <= 6399, 1, 0)
+X_test_without_dummyNA$zipcode_64 <- ifelse(X_test_without_dummyNA$zipcode >= 6400 & X_test_without_dummyNA$zipcode <= 6499, 1, 0)
+X_test_without_dummyNA$zipcode_65 <- ifelse(X_test_without_dummyNA$zipcode >= 6500 & X_test_without_dummyNA$zipcode <= 6599, 1, 0)
+X_test_without_dummyNA$zipcode_66 <- ifelse(X_test_without_dummyNA$zipcode >= 6600 & X_test_without_dummyNA$zipcode <= 6699, 1, 0)
+X_test_without_dummyNA$zipcode_67 <- ifelse(X_test_without_dummyNA$zipcode >= 6700 & X_test_without_dummyNA$zipcode <= 6799, 1, 0)
+X_test_without_dummyNA$zipcode_68 <- ifelse(X_test_without_dummyNA$zipcode >= 6800 & X_test_without_dummyNA$zipcode <= 6899, 1, 0)
+X_test_without_dummyNA$zipcode_69 <- ifelse(X_test_without_dummyNA$zipcode >= 6900 & X_test_without_dummyNA$zipcode <= 6999, 1, 0)
+X_test_without_dummyNA$zipcode_70 <- ifelse(X_test_without_dummyNA$zipcode >= 7000 & X_test_without_dummyNA$zipcode <= 7099, 1, 0)
+X_test_without_dummyNA$zipcode_71 <- ifelse(X_test_without_dummyNA$zipcode >= 7100 & X_test_without_dummyNA$zipcode <= 7199, 1, 0)
+X_test_without_dummyNA$zipcode_72 <- ifelse(X_test_without_dummyNA$zipcode >= 7200 & X_test_without_dummyNA$zipcode <= 7299, 1, 0)
+X_test_without_dummyNA$zipcode_73 <- ifelse(X_test_without_dummyNA$zipcode >= 7300 & X_test_without_dummyNA$zipcode <= 7399, 1, 0)
+X_test_without_dummyNA$zipcode_74 <- ifelse(X_test_without_dummyNA$zipcode >= 7400 & X_test_without_dummyNA$zipcode <= 7499, 1, 0)
+X_test_without_dummyNA$zipcode_75 <- ifelse(X_test_without_dummyNA$zipcode >= 7500 & X_test_without_dummyNA$zipcode <= 7599, 1, 0)
+X_test_without_dummyNA$zipcode_76 <- ifelse(X_test_without_dummyNA$zipcode >= 7600 & X_test_without_dummyNA$zipcode <= 7699, 1, 0)
+X_test_without_dummyNA$zipcode_77 <- ifelse(X_test_without_dummyNA$zipcode >= 7700 & X_test_without_dummyNA$zipcode <= 7799, 1, 0)
+X_test_without_dummyNA$zipcode_78 <- ifelse(X_test_without_dummyNA$zipcode >= 7800 & X_test_without_dummyNA$zipcode <= 7899, 1, 0)
+X_test_without_dummyNA$zipcode_79 <- ifelse(X_test_without_dummyNA$zipcode >= 7900 & X_test_without_dummyNA$zipcode <= 7999, 1, 0)
+X_test_without_dummyNA$zipcode_80 <- ifelse(X_test_without_dummyNA$zipcode >= 8000 & X_test_without_dummyNA$zipcode <= 8099, 1, 0)
+X_test_without_dummyNA$zipcode_81 <- ifelse(X_test_without_dummyNA$zipcode >= 8100 & X_test_without_dummyNA$zipcode <= 8199, 1, 0)
+X_test_without_dummyNA$zipcode_82 <- ifelse(X_test_without_dummyNA$zipcode >= 8200 & X_test_without_dummyNA$zipcode <= 8299, 1, 0)
+X_test_without_dummyNA$zipcode_83 <- ifelse(X_test_without_dummyNA$zipcode >= 8300 & X_test_without_dummyNA$zipcode <= 8399, 1, 0)
+X_test_without_dummyNA$zipcode_84 <- ifelse(X_test_without_dummyNA$zipcode >= 8400 & X_test_without_dummyNA$zipcode <= 8499, 1, 0)
+X_test_without_dummyNA$zipcode_85 <- ifelse(X_test_without_dummyNA$zipcode >= 8500 & X_test_without_dummyNA$zipcode <= 8599, 1, 0)
+X_test_without_dummyNA$zipcode_86 <- ifelse(X_test_without_dummyNA$zipcode >= 8600 & X_test_without_dummyNA$zipcode <= 8699, 1, 0)
+X_test_without_dummyNA$zipcode_87 <- ifelse(X_test_without_dummyNA$zipcode >= 8700 & X_test_without_dummyNA$zipcode <= 8799, 1, 0)
+X_test_without_dummyNA$zipcode_88 <- ifelse(X_test_without_dummyNA$zipcode >= 8800 & X_test_without_dummyNA$zipcode <= 8899, 1, 0)
+X_test_without_dummyNA$zipcode_89 <- ifelse(X_test_without_dummyNA$zipcode >= 8900 & X_test_without_dummyNA$zipcode <= 8999, 1, 0)
+X_test_without_dummyNA$zipcode_90 <- ifelse(X_test_without_dummyNA$zipcode >= 9000 & X_test_without_dummyNA$zipcode <= 9099, 1, 0)
+X_test_without_dummyNA$zipcode_91 <- ifelse(X_test_without_dummyNA$zipcode >= 9100 & X_test_without_dummyNA$zipcode <= 9199, 1, 0)
+X_test_without_dummyNA$zipcode_92 <- ifelse(X_test_without_dummyNA$zipcode >= 9200 & X_test_without_dummyNA$zipcode <= 9299, 1, 0)
+X_test_without_dummyNA$zipcode_93 <- ifelse(X_test_without_dummyNA$zipcode >= 9300 & X_test_without_dummyNA$zipcode <= 9399, 1, 0)
+X_test_without_dummyNA$zipcode_94 <- ifelse(X_test_without_dummyNA$zipcode >= 9400 & X_test_without_dummyNA$zipcode <= 9499, 1, 0)
+X_test_without_dummyNA$zipcode_95 <- ifelse(X_test_without_dummyNA$zipcode >= 9500 & X_test_without_dummyNA$zipcode <= 9599, 1, 0)
+X_test_without_dummyNA$zipcode_96 <- ifelse(X_test_without_dummyNA$zipcode >= 9600 & X_test_without_dummyNA$zipcode <= 9699, 1, 0)
+X_test_without_dummyNA$zipcode_97 <- ifelse(X_test_without_dummyNA$zipcode >= 9700 & X_test_without_dummyNA$zipcode <= 9799, 1, 0)
+X_test_without_dummyNA$zipcode_98 <- ifelse(X_test_without_dummyNA$zipcode >= 9800 & X_test_without_dummyNA$zipcode <= 9899, 1, 0)
+X_test_without_dummyNA$zipcode_99 <- ifelse(X_test_without_dummyNA$zipcode >= 9900 & X_test_without_dummyNA$zipcode <= 9999, 1, 0)
+
+# check if there are no observations for zipcode dummy
+check_zipcode_dummy <- colSums(X_test_without_dummyNA == 0)
+which(check_zipcode_dummy == dim(X_test_without_dummyNA)[1]| check_zipcode_dummy == (dim(X_test_without_dummyNA)[1] -1))
+train_without_dummyNA <- subset(train_without_dummyNA, select = -c(zipcode, zipcode_58, zipcode_59,zipcode_76, zipcode_78, zipcode_79, zipcode_97, zipcode_98, zipcode_99)) # I also delete the original ZIPCODE variable here. one more zipcode not existent compared to train
+
+
 # delete some useless or redundant variables
-X_test_imputed <- subset(X_test_without_dummyNA, select = -c(id, address, area_useable, date, date_available, municipality, street))
+X_test_without_dummyNA <- subset(X_test_without_dummyNA, select = -c(id, # just like row name, useless
+                                                                   address, # some spelling mistake, and we have zipcode
+                                                                   area_useable, # too many missing values
+                                                                   date, # date of ad publishment should not matter
+                                                                   date_available, # too sparse information
+                                                                   municipality, # we have zip code
+                                                                   sale, # only contains 1's
+                                                                   street)) # again, we use zip code
 
-apply(X_test_without_dummyNA,2, pMiss)
+```
 
-summary(X_test_without_dummyNA)
+
+## Imputation of the test dataset
+
+```{r}
 ## multiple core computation
 
 
@@ -947,18 +1094,25 @@ cl <- makeCluster(K)
 
 registerDoParallel(cl)
 
-# using "pmm" method from MICE package, as it needs quite a lot computation we set m=1 and maxit=1
-  X_test_imputed_pmm <- complete(mice(X_test_imputed, m=2, maxit = 5, meth = "pmm", seed = 50), 1) 
-write.csv(X_test_imputed_pmm, file = "./X_test_imputed_pmm.csv", row.names = FALSE)
-
-# using "rf" method from MICE package
-  train_imputed_rf <- complete(mice(train_imputed, m=2, maxit = 5, meth = "rf", seed = 50), 1) 
-write.csv(train_imputed_rf, file = "./train_imputed_rf.csv", row.names = FALSE)
-#apply(train_imputation_rf,2, pMiss)
+# using "cart" method from MICE package
+  X_test_imputed_cart <- complete(mice(X_test_without_dummyNA, m=1, maxit = 20, meth = "cart", seed = 50))
+write.csv(X_test_imputed_cart, file = "./X_test_imputed_cart.csv", row.names = FALSE)
 
 # Once you finished, you deactivate the cluster
 # with these two commands.
 stopCluster(cl)
 registerDoSEQ()
-
 ```
+
+## Predicting on the imputed test data
+
+```{r}
+
+test_yhat <- final_model %>% predict(newdata = X_test_imputed_cart)
+
+head(test_yhat)
+# store prediction
+
+write.table(test_yhat, file = "Y_test.csv", row.names = FALSE, col.names = FALSE)
+```
+
