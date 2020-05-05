@@ -29,8 +29,8 @@ library(randomForest)
 library(doParallel)
 library(caret)
 library(glmnet)
-library(MASS) # for stepAIC formula
-library(leaps) # for regsubsets model selection
+library(MASS) 
+library(leaps) 
 library(tree)
 library(corrplot)
 library(splines)
@@ -651,7 +651,15 @@ data.frame( R2 = R2(predictions_lm_forward, test.data$price),
             RMSE = RMSE(predictions_lm_forward, test.data$price),
             MAE = MAE(predictions_lm_forward, test.data$price))
 
+# hybrid selection: RMSE = 379362.6
+lm_hybrid <-  stepAIC(lm_start, direction = "both", scope = formula(lm_fit2))
+predictions_lm_hybrid <- lm_hybrid %>% predict(test.data)
+data.frame( R2 = R2(predictions_lm_hybrid, test.data$price),
+            RMSE = RMSE(predictions_lm_hybrid, test.data$price),
+            MAE = MAE(predictions_lm_hybrid, test.data$price))
 
+# store mse: we choose backward selection since it gives us the minimum RMSE among these three models.
+lm_backward_mse <- (RMSE(predictions_lm_backward, test.data$price)^2)
 ```
 
 
@@ -747,6 +755,7 @@ cv_tree <- cv.tree(tree_fit)
 tree_testyhat <- predict(tree_fit, newdata = test.data)
 tree_mse <- mean((test.data$price - tree_testyhat)^2)
 
+# Random forest
 rf <- ranger(price ~., data = train.data, write.forest = TRUE)
 rf_testyhat <- predict(rf, test.data)$predictions
 rf_mse <- mean((test.data$price - rf_testyhat)^2)
