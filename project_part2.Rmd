@@ -409,21 +409,22 @@ plot(train_imputed_cart$year_built, train_imputed_cart$price) # quadratic/expone
 
 ## Splitting our training data into training and validation partitions
 
+We use the cart imputed data as our go to model as it is the one which is more similar to the original data in terms of distribution and we therefore think of it as performing better. We will later test our best performing models on the mean imputed data. 
 
 ```{r}
 
 # Split the data into training and test set
 
 set.seed(123)
-training.samples <- train_imputed_mean$price %>%
+training.samples <- train_imputed_cart$price %>%
   createDataPartition(p = 0.8, list = FALSE)
-train.data  <- train_imputed_mean[training.samples, ]
-test.data <- train_imputed_mean[-training.samples, ]
+train.data  <- train_imputed_cart[training.samples, ]
+test.data <- train_imputed_cart[-training.samples, ]
 
-training.samples_reference <- train_imputed_cart$price %>%
+training.samples_reference <- train_imputed_mean$price %>%
   createDataPartition(p = 0.8, list = FALSE)
-train.data_reference  <- train_imputed_cart[training.samples_reference, ]
-test.data_reference <- train_imputed_cart[-training.samples_reference, ]
+train.data_reference  <- train_imputed_mean[training.samples_reference, ]
+test.data_reference <- train_imputed_mean[-training.samples_reference, ]
 
 ```
 
@@ -1111,6 +1112,7 @@ registerDoSEQ()
 test_yhat <- final_model %>% predict(newdata = X_test_imputed_cart)
 
 head(test_yhat)
+
 # store prediction
 
 write.table(test_yhat, file = "Y_test.csv", row.names = FALSE, col.names = FALSE)
