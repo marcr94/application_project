@@ -11,9 +11,9 @@ output:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## Data Pre-Processing
+# Data Pre-Processing
 
-# Set up work space
+## Set up work space
 
 We tidy up our environment, load some packages that we are gonna use later on and load our train and test data.
 
@@ -48,7 +48,7 @@ X_test <- read.csv("./X_test.csv")
 
 ```
 
-# Overview our data
+## Overview our data
 
 Let's have a look at our data. We have no data set information/fact sheet so we will have to figure out the content ourselves...
 
@@ -108,7 +108,7 @@ We have the following columns:
   + wheelchair
 
 
-# Data Cleaning
+## Data Cleaning
 
 
 ```{r}
@@ -370,10 +370,10 @@ corrplot(train_forcorr, method = "circle", title = "Correlation Plot for cart im
 The correlation matrices look very similar and only differ very slightly between the two imputed data sets and the data without imputation.
 
 
-## Model selection
+# Modeling
 
 
-# Preperational insights
+## Preperational insights
 
 
 We now wanna have a first look at which variables might influence our outcome variable and in which way. We take a look at graphs showing the bivariate relationship between different independent variables and our outcome variable, price.
@@ -404,7 +404,7 @@ plot(train_imputed_cart$year_built, train_imputed_cart$price) # quadratic/expone
 ```
 
 
-# Splitting our training data into training and validation partitions
+## Splitting our training data into training and validation partitions
 
 
 ```{r}
@@ -425,7 +425,7 @@ test.data_reference <- train_imputed_cart[-training.samples_reference, ]
 ```
 
 
-# Linear Model
+## Linear Model
 
 
 We build a first basic linear model.
@@ -663,7 +663,7 @@ lm_backward_mse <- (RMSE(predictions_lm_backward, test.data$price)^2)
 ```
 
 
-# Ridge, LASSO and Elastic-net regression
+## Ridge, LASSO and Elastic-net regression
 
 Our data has quite some variables. Especially as we redifined NA's to 0 in the case of dummy variables and imputed the other ones, this can introduce bias. Also, we do not want our model to get into the trap of what is known as "the curse of dimensionality". One way to work against this is to build a LASSO Model - which is designed to force coefficients to get exactly zero. This way, we might be able to drop some variables which do not have good explanational power.
 
@@ -702,7 +702,7 @@ for (i in 0:10) {
   results <- rbind(results, temp)
 }
 
-# from results, we can see Lasso (alpha = 1) performs best.
+# from results, we can see Lasso (alpha = 1) performs best among these three.
 lasso_fit <- cv.glmnet(train_x, train_y, type.measure="mse", 
   alpha=1, family="gaussian")
 
@@ -710,56 +710,199 @@ lasso_predicted <- predict(lasso_fit, s=lasso_fit$lambda.min, newx = test_x)
 
 lasso_mse <- mean((test_y - lasso_predicted)^2)
 
+# Lasso with interaction terms: RMSE = 394129.6
+train_x_1 <- model.matrix(price ~ .  + area:rooms + floors:elevator + area:floors 
+              + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
+              + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
+              + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
+              + area:zipcode_26 + area:zipcode_27 + area:zipcode_28 + area:zipcode_29 + area:zipcode_30 
+              + area:zipcode_31 + area:zipcode_32 + area:zipcode_33 + area:zipcode_34 + area:zipcode_35 
+              + area:zipcode_36 + area:zipcode_37 + area:zipcode_38 + area:zipcode_39 + area:zipcode_40  
+              + area:zipcode_41 + area:zipcode_42 + area:zipcode_43 + area:zipcode_44 + area:zipcode_45 
+              + area:zipcode_46 + area:zipcode_47 + area:zipcode_48 + area:zipcode_49 + area:zipcode_50 
+              + area:zipcode_51 + area:zipcode_52 + area:zipcode_53 + area:zipcode_54 + area:zipcode_55 
+              + area:zipcode_56 + area:zipcode_57 + area:zipcode_60 + area:zipcode_61 + area:zipcode_62 
+              + area:zipcode_63 + area:zipcode_64 + area:zipcode_65 + area:zipcode_66 + area:zipcode_67 
+              + area:zipcode_68 + area:zipcode_69 + area:zipcode_70 + area:zipcode_71 + area:zipcode_72 
+              + area:zipcode_73 + area:zipcode_74 + area:zipcode_75 + area:zipcode_76 + area:zipcode_77
+              + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
+              + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
+              + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
+              + area:zipcode_95 + area:zipcode_96, data = train.data)[, -1]
+
+test_x_1 <- model.matrix(price ~ .  + area:rooms + floors:elevator + area:floors 
+              + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
+              + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
+              + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
+              + area:zipcode_26 + area:zipcode_27 + area:zipcode_28 + area:zipcode_29 + area:zipcode_30 
+              + area:zipcode_31 + area:zipcode_32 + area:zipcode_33 + area:zipcode_34 + area:zipcode_35 
+              + area:zipcode_36 + area:zipcode_37 + area:zipcode_38 + area:zipcode_39 + area:zipcode_40  
+              + area:zipcode_41 + area:zipcode_42 + area:zipcode_43 + area:zipcode_44 + area:zipcode_45 
+              + area:zipcode_46 + area:zipcode_47 + area:zipcode_48 + area:zipcode_49 + area:zipcode_50 
+              + area:zipcode_51 + area:zipcode_52 + area:zipcode_53 + area:zipcode_54 + area:zipcode_55 
+              + area:zipcode_56 + area:zipcode_57 + area:zipcode_60 + area:zipcode_61 + area:zipcode_62 
+              + area:zipcode_63 + area:zipcode_64 + area:zipcode_65 + area:zipcode_66 + area:zipcode_67 
+              + area:zipcode_68 + area:zipcode_69 + area:zipcode_70 + area:zipcode_71 + area:zipcode_72 
+              + area:zipcode_73 + area:zipcode_74 + area:zipcode_75 + area:zipcode_76 + area:zipcode_77
+              + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
+              + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
+              + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
+              + area:zipcode_95 + area:zipcode_96, data = test.data)[, -1]
+
+lasso_fit_1 <- cv.glmnet(train_x_1, train_y, type.measure="mse", 
+  alpha=1, family="gaussian")
+lasso_predicted_1 <- predict(lasso_fit_1, s=lasso_fit_1$lambda.min, newx = test_x_1)
+lasso_intreaction_mse <- mean((test_y - lasso_predicted_1)^2))
 ```
 
 
-# Moving to nonlinearity: Smooth Spline and GAM
+## Moving beyond linearity: Smooth Spline and GAMs
 
 
 ```{r}
 # Smoothing spline for rooms
 room.fit <- smooth.spline(train.data$rooms, train.data$price, cv=TRUE)
-room.fit$df
+plot(train.data$rooms, train.data$price ,col =" gray ")
+lines(room.fit ,col ="red",lwd =2)
 
 floors.fit <- smooth.spline(train.data$floors, train.data$price, cv=TRUE)
-floors.fit$df
+plot(train.data$floors, train.data$price ,col =" gray ")
+lines(floors.fit ,col ="red",lwd =2)
 
 area.fit <- smooth.spline(train.data$area, train.data$price, cv=TRUE)
-area.fit$df
+plot(train.data$area, train.data$price ,col =" gray ")
+lines(area.fit, col ="red",lwd =2)
 
-# gam without interaction terms
+# GAM with smoothing splines
 gam.m0 <- gam(price ~ . - area + s(area, area.fit$df) - floors + s(floors, floors.fit$df) - rooms + s(rooms, room.fit$df), data = train.data)
 gam.m0_pred <- gam.m0 %>% predict(test.data)
 data.frame( R2 = R2(gam.m0_pred, test.data$price),
             RMSE = RMSE(gam.m0_pred, test.data$price),
             MAE = MAE(gam.m0_pred, test.data$price))
-
-# store mse
-
 gam_m0_mse <- ((RMSE(gam.m0_pred, test.data$price))^2)
 
+# GAM with variables from backward selection and smoothing splines: RMSE = 381470.8	
+gam.m1 <- gam(price ~ balcony + basement + bath_tube + cheminee + elevator + 
+    home_type + kids_friendly + laundry + newly_built + oldbuilding + 
+    oven + parking_indoor + parking_outside + pool + terrace + 
+    topstorage + wheelchair + year + year_built + zipcode_11 + 
+    zipcode_12 + zipcode_13 + zipcode_14 + zipcode_15 + zipcode_16 + 
+    zipcode_17 + zipcode_18 + zipcode_19 + zipcode_20 + zipcode_21 + 
+    zipcode_22 + zipcode_23 + zipcode_24 + zipcode_25 + zipcode_26 + 
+    zipcode_27 + zipcode_28 + zipcode_29 + zipcode_30 + zipcode_31 + 
+    zipcode_32 + zipcode_33 + zipcode_34 + zipcode_35 + zipcode_36 + 
+    zipcode_37 + zipcode_38 + zipcode_39 + zipcode_41 + zipcode_42 + 
+    zipcode_43 + zipcode_44 + zipcode_45 + zipcode_46 + zipcode_47 + 
+    zipcode_48 + zipcode_49 + zipcode_50 + zipcode_51 + zipcode_52 + 
+    zipcode_53 + zipcode_54 + zipcode_55 + zipcode_56 + zipcode_57 + 
+    zipcode_60 + zipcode_61 + zipcode_62 + zipcode_63 + zipcode_64 + 
+    zipcode_65 + zipcode_66 + zipcode_67 + zipcode_68 + zipcode_69 + 
+    zipcode_70 + zipcode_71 + zipcode_72 + zipcode_73 + zipcode_74 + 
+    zipcode_75 + zipcode_76 + zipcode_77 + zipcode_80 + zipcode_81 + 
+    zipcode_82 + zipcode_83 + zipcode_84 + zipcode_85 + zipcode_86 + 
+    zipcode_87 + zipcode_88 + zipcode_89 + zipcode_90 + zipcode_91 + 
+    zipcode_92 + zipcode_93 + zipcode_94 + zipcode_95 + zipcode_96 + 
+    area:rooms + s(area, area.fit$df) + s(floors, floors.fit$df) + s(rooms, room.fit$df) + 
+    elevator:floors + area:floors + zipcode_11:area + zipcode_12:area + 
+    zipcode_13:area + zipcode_14:area + zipcode_15:area + zipcode_16:area + 
+    zipcode_17:area + zipcode_18:area + zipcode_19:area + zipcode_20:area + 
+    zipcode_21:area + zipcode_22:area + zipcode_23:area + zipcode_24:area + 
+    zipcode_25:area + zipcode_26:area + zipcode_27:area + zipcode_28:area + 
+    zipcode_29:area + zipcode_30:area + zipcode_31:area + zipcode_32:area + 
+    zipcode_33:area + zipcode_34:area + zipcode_35:area + zipcode_36:area + 
+    zipcode_38:area + zipcode_39:area + zipcode_41:area + zipcode_42:area + 
+    zipcode_43:area + zipcode_44:area + zipcode_45:area + zipcode_46:area + 
+    zipcode_47:area + zipcode_48:area + zipcode_49:area + zipcode_50:area + 
+    zipcode_51:area + zipcode_52:area + zipcode_53:area + zipcode_54:area + 
+    zipcode_55:area + zipcode_56:area + zipcode_57:area + zipcode_60:area + 
+    zipcode_61:area + zipcode_62:area + zipcode_63:area + zipcode_65:area + 
+    zipcode_67:area + zipcode_68:area + zipcode_70:area + zipcode_71:area + 
+    zipcode_73:area + zipcode_74:area + zipcode_75:area + zipcode_76:area + 
+    zipcode_80:area + zipcode_81:area + zipcode_82:area + zipcode_83:area + 
+    zipcode_84:area + zipcode_85:area + zipcode_86:area + zipcode_87:area + 
+    zipcode_88:area + zipcode_89:area + zipcode_90:area + zipcode_91:area + 
+    zipcode_92:area + zipcode_93:area + zipcode_94:area + zipcode_95:area + 
+    zipcode_96:area, data = train.data)
+gam.m1_pred <- gam.m1 %>% predict(test.data)
+data.frame( R2 = R2(gam.m1_pred, test.data$price),
+            RMSE = RMSE(gam.m1_pred, test.data$price),
+            MAE = MAE(gam.m1_pred, test.data$price))
+gam_m1_mse <- ((RMSE(gam.m1_pred, test.data$price))^2)
+
+# Lasso with smoothing splines: RMSE = 394168
+train_x_2 <- model.matrix(price ~ .  - area + s(area, area.fit$df) - floors + s(floors, floors.fit$df) 
+              - rooms + s(rooms, room.fit$df) + area:rooms + floors:elevator + area:floors 
+              + area:zipcode_11+ area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
+              + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
+              + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
+              + area:zipcode_26 + area:zipcode_27 + area:zipcode_28 + area:zipcode_29 + area:zipcode_30 
+              + area:zipcode_31 + area:zipcode_32 + area:zipcode_33 + area:zipcode_34 + area:zipcode_35 
+              + area:zipcode_36 + area:zipcode_37 + area:zipcode_38 + area:zipcode_39 + area:zipcode_40  
+              + area:zipcode_41 + area:zipcode_42 + area:zipcode_43 + area:zipcode_44 + area:zipcode_45 
+              + area:zipcode_46 + area:zipcode_47 + area:zipcode_48 + area:zipcode_49 + area:zipcode_50 
+              + area:zipcode_51 + area:zipcode_52 + area:zipcode_53 + area:zipcode_54 + area:zipcode_55 
+              + area:zipcode_56 + area:zipcode_57 + area:zipcode_60 + area:zipcode_61 + area:zipcode_62 
+              + area:zipcode_63 + area:zipcode_64 + area:zipcode_65 + area:zipcode_66 + area:zipcode_67 
+              + area:zipcode_68 + area:zipcode_69 + area:zipcode_70 + area:zipcode_71 + area:zipcode_72 
+              + area:zipcode_73 + area:zipcode_74 + area:zipcode_75 + area:zipcode_76 + area:zipcode_77
+              + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
+              + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
+              + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
+              + area:zipcode_95 + area:zipcode_96, data = train.data)[, -1]
+
+
+test_x_2 <- model.matrix(price ~ .  - area + s(area, area.fit$df) - floors + s(floors, floors.fit$df) 
+              - rooms + s(rooms, room.fit$df) + area:rooms + floors:elevator + area:floors 
+              + area:zipcode_11 + area:zipcode_12 + area:zipcode_13 + area:zipcode_14 + area:zipcode_15 
+              + area:zipcode_16 + area:zipcode_17 + area:zipcode_18 + area:zipcode_19 + area:zipcode_20 
+              + area:zipcode_21 + area:zipcode_22 + area:zipcode_23 + area:zipcode_24 + area:zipcode_25 
+              + area:zipcode_26 + area:zipcode_27 + area:zipcode_28 + area:zipcode_29 + area:zipcode_30 
+              + area:zipcode_31 + area:zipcode_32 + area:zipcode_33 + area:zipcode_34 + area:zipcode_35 
+              + area:zipcode_36 + area:zipcode_37 + area:zipcode_38 + area:zipcode_39 + area:zipcode_40  
+              + area:zipcode_41 + area:zipcode_42 + area:zipcode_43 + area:zipcode_44 + area:zipcode_45 
+              + area:zipcode_46 + area:zipcode_47 + area:zipcode_48 + area:zipcode_49 + area:zipcode_50 
+              + area:zipcode_51 + area:zipcode_52 + area:zipcode_53 + area:zipcode_54 + area:zipcode_55 
+              + area:zipcode_56 + area:zipcode_57 + area:zipcode_60 + area:zipcode_61 + area:zipcode_62 
+              + area:zipcode_63 + area:zipcode_64 + area:zipcode_65 + area:zipcode_66 + area:zipcode_67 
+              + area:zipcode_68 + area:zipcode_69 + area:zipcode_70 + area:zipcode_71 + area:zipcode_72 
+              + area:zipcode_73 + area:zipcode_74 + area:zipcode_75 + area:zipcode_76 + area:zipcode_77
+              + area:zipcode_80 + area:zipcode_81 + area:zipcode_82 + area:zipcode_83 + area:zipcode_84 
+              + area:zipcode_85 + area:zipcode_86 + area:zipcode_87 + area:zipcode_88 + area:zipcode_89 
+              + area:zipcode_90 + area:zipcode_91 + area:zipcode_92 + area:zipcode_93 + area:zipcode_94 
+              + area:zipcode_95 + area:zipcode_96, data = test.data)[, -1]
+
+lasso_fit_2 <- cv.glmnet(train_x_2, train_y, type.measure="mse", 
+  alpha=1, family="gaussian")
+lasso_predicted_2 <- predict(lasso_fit_2, s=lasso_fit_2$lambda.min, newx = test_x_2)
+lasso_gam_mse <- mean((test_y - lasso_predicted_2)^2)
 ```
 
 
 Our lasso model has the advantage that there is only 15 predictors left which are used for computing the estimates. Also , our LASSO Model has the best RMSE so far. 
 
-# Walking into the forest for some qualitree times
-
+## Walking into the forest for some qualitree times
+We can see that the regression tree is not competitive with other supervised learning approaches that shown before. The plot tree with node labels suggests that the regression tree only considers two variables, area and zipcode, and has only 7 terminal nodes. Consequently, its prediction accuracy is pretty low. In order to producee a more powerful prediction model, we also use random forest approach.
 ```{r}
-# Fitting regression tree
-
+# build a regression tree: 478696.5
 set.seed(1)
 
 tree_fit <- tree(price ~. , data = train.data)
 cv_tree <- cv.tree(tree_fit)
 tree_testyhat <- predict(tree_fit, newdata = test.data)
 tree_mse <- mean((test.data$price - tree_testyhat)^2)
+plot(tree_fit)
+text(tree_fit, pretty = 0)
 
+
+# random forest: RMSE = 396742.6, much better:)))
+=======
 # Random forest
+
 rf <- ranger(price ~., data = train.data, write.forest = TRUE)
 rf_testyhat <- predict(rf, test.data)$predictions
 rf_mse <- mean((test.data$price - rf_testyhat)^2)
 ```
+
 
 # Compare Models
 
