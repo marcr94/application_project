@@ -38,6 +38,7 @@ library(foreach)
 library(gam)
 library(boot) 
 library(ranger)
+library(tikzDevice)
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -332,11 +333,15 @@ plot(density(train_without_dummyNA$area, na.rm = TRUE), main = "area(dummyNA)")
 plot(density(train_imputed_mean$area), main = "area(mean)", col = "red")
 plot(density(train_imputed_cart$area), main = "area(cart)", col = "green")
 
+tikz(file = "./floordensity.tex", width = 3.5, height = 3.5) # figure for report
+
 # floors
 par(mfrow=c(1,3))
 plot(density(train_without_dummyNA$floors, na.rm = TRUE), main = "floors(dummyNA)")
 plot(density(train_imputed_mean$floors), main = "floors(mean)", col = "red")
 plot(density(train_imputed_cart$floors), main = "floors(cart)", col = "green")
+
+dev.off() # for tikz
 
 # rooms
 par(mfrow=c(1,3))
@@ -346,9 +351,10 @@ plot(density(train_imputed_cart$rooms), main = "rooms(cart)", col = "green")
 
 # year_built
 par(mfrow=c(1,3))
-plot(density(train_without_dummyNA$year_built, na.rm = TRUE), main = "year_built(dummyNA)")
-plot(density(train_imputed_mean$year_built), main = "year_built(mean)", col = "red")
-plot(density(train_imputed_cart$year_built), main = "year_built(cart)", col = "green")
+plot(density(train_without_dummyNA$year_built, na.rm = TRUE), main = "year\\_built(dummyNA)")
+plot(density(train_imputed_mean$year_built), main = "year\\_built(mean)", col = "red")
+plot(density(train_imputed_cart$year_built), main = "year\\_built(cart)", col = "green")
+
 
 ```
 
@@ -383,6 +389,8 @@ We now wanna have a first look at which variables might influence our outcome va
 
 ```{r}
 
+
+
 plot(train_imputed_mean$area, train_imputed_mean$price) # maybe delete area >600 , relationship seems pretty linear 
 
 plot(train_imputed_mean$floors, train_imputed_mean$price) # hard to tell, but looks non linear
@@ -393,17 +401,37 @@ plot(train_imputed_mean$year, train_imputed_mean$price) # no relationship detect
 
 plot(train_imputed_mean$year_built, train_imputed_mean$price) # quadratic/exponential ??
 
+tikz("./bivariatecorr.tex", width = 3.5, height = 3.5)
+
+ggplot(train_imputed_cart, aes(area, price)) +
+  geom_point() +
+ labs( x = "area", y = "price")
+ggplot(train_imputed_cart, aes(floors, price)) +
+  geom_point() +
+ labs( x = "floors", y = "price")
+ggplot(train_imputed_cart, aes(rooms, price)) +
+  geom_point() +
+ labs( x = "rooms", y = "price")
+ggplot(train_imputed_cart, aes(year, price)) +
+  geom_point() +
+ labs( x = "year", y = "price")
+ggplot(train_imputed_cart, aes(year_built, price)) +
+  geom_point() +
+ labs( x = "year\\_built", y = "price")
+
+dev.off()
+
+ggplot(train_imputed_cart$area, train_imputed_cart$price, xlab = "area", ylab = "price") # maybe delete area >600 # relationship seems pretty linear 
+
+plot(train_imputed_cart$floors, train_imputed_cart$price, xlab = "floors", ylab = "price") # hard to tellbut looks non linear
+
+plot(train_imputed_cart$rooms, train_imputed_cart$price, xlab = "rooms", ylab = "price") # hard to tell too
+
+plot(train_imputed_cart$year, train_imputed_cart$price, xlab = "year", ylab = "price") # no relationship detectable
+
+plot(train_imputed_cart$year_built, train_imputed_cart$price, xlab = "year\\_built", ylab = "price") # quadratic/exponential ??
 
 
-plot(train_imputed_cart$area, train_imputed_cart$price) # maybe delete area >600 # relationship seems pretty linear 
-
-plot(train_imputed_cart$floors, train_imputed_cart$price) # hard to tellbut looks non linear
-
-plot(train_imputed_cart$rooms, train_imputed_cart$price) # hard to tell too
-
-plot(train_imputed_cart$year, train_imputed_cart$price) # no relationship detectable
-
-plot(train_imputed_cart$year_built, train_imputed_cart$price) # quadratic/exponential ??
 ```
 
 
